@@ -350,6 +350,12 @@ st.markdown(
         color: var(--white-soft) !important;
     }
 
+    .stSelectbox [data-baseweb="select"] [data-testid="stMarkdownContainer"] p,
+    .stSelectbox [data-baseweb="select"] span,
+    .stSelectbox [data-baseweb="select"] div {
+        color: #f5efe6 !important;
+    }
+
     div[data-testid="stPopoverBody"],
     div[data-testid="stPopoverBody"] > div,
     div[data-baseweb="popover"],
@@ -394,6 +400,14 @@ st.markdown(
         background: transparent !important;
         color: #f5efe6 !important;
         border-radius: 10px !important;
+    }
+
+    li[role="option"] *,
+    ul[role="listbox"] li *,
+    div[data-baseweb="menu"] li *,
+    div[data-baseweb="popover"] li * {
+        color: #f5efe6 !important;
+        opacity: 1 !important;
     }
 
     li[role="option"][aria-selected="true"],
@@ -744,64 +758,78 @@ with tab1:
 
 with tab2:
     st.markdown('<div class="tab-panel">', unsafe_allow_html=True)
+    historical_metric_options = [
+        {
+            "label": "Nivel de riesgo",
+            "column": "risk_score",
+            "title": "Evolución del nivel de riesgo",
+            "info_title": "Nivel de riesgo histórico",
+            "info_text": "Este gráfico muestra la trayectoria histórica del indicador agregado de riesgo. Permite identificar fases de deterioro, normalización y persistencia del estrés.",
+            "caption": "Trayectoria histórica del indicador agregado de riesgo.",
+        },
+        {
+            "label": "CVaR 95% 60d",
+            "column": "cvar_95_60d",
+            "title": "CVaR (95%, 60d)",
+            "info_title": "CVaR histórico",
+            "info_text": "Este panel sigue la evolución del Conditional Value at Risk en ventana móvil. Cuanto más extremo sea su valor, más severas son las pérdidas esperadas en escenarios adversos.",
+            "caption": "Evolución del riesgo de cola.",
+        },
+        {
+            "label": "Volatilidad 20d",
+            "column": "vol_20d",
+            "title": "Volatilidad (20d)",
+            "info_title": "Volatilidad histórica",
+            "info_text": "Esta serie recoge la volatilidad realizada a 20 días. Es una señal útil para seguir episodios de inestabilidad reciente.",
+            "caption": "Evolución de la variabilidad reciente del mercado.",
+        },
+        {
+            "label": "Drawdown",
+            "column": "drawdown",
+            "title": "Drawdown",
+            "info_title": "Drawdown histórico",
+            "info_text": "El drawdown permite seguir la profundidad de las caídas acumuladas respecto al máximo más reciente. Resulta especialmente útil para detectar fases de deterioro prolongado.",
+            "caption": "Pérdidas acumuladas respecto a máximos previos.",
+        },
+        {
+            "label": "Skewness",
+            "column": "skew_60d",
+            "title": "Asimetría (60d)",
+            "info_title": "Asimetría histórica",
+            "info_text": "La asimetría muestra si la distribución de rendimientos tiene más peso hacia la cola izquierda o derecha. En episodios de estrés suelen aparecer sesgos más negativos.",
+            "caption": "Asimetría de la distribución de rendimientos.",
+        },
+    ]
 
-    st.markdown('<div class="panel-box">', unsafe_allow_html=True)
-    panel_header(
-        "Evolución del nivel de riesgo",
-        "Nivel de riesgo histórico",
-        "Este gráfico muestra la trayectoria histórica del indicador agregado de riesgo. Permite identificar fases de deterioro, normalización y persistencia del estrés."
-    )
-    st.line_chart(df.set_index("date")["risk_score"], use_container_width=True)
-    st.caption("Trayectoria histórica del indicador agregado de riesgo.")
-    st.markdown("</div>", unsafe_allow_html=True)
+    available_historical_metrics = [
+        metric for metric in historical_metric_options if metric["column"] in df.columns
+    ]
 
-    col1, col2 = st.columns(2)
-
-    with col1:
+    if available_historical_metrics:
         st.markdown('<div class="panel-box">', unsafe_allow_html=True)
-        panel_header(
-            "CVaR (95%, 60d)",
-            "CVaR histórico",
-            "Este panel sigue la evolución del Conditional Value at Risk en ventana móvil. Cuanto más extremo sea su valor, más severas son las pérdidas esperadas en escenarios adversos."
+        selected_historical_label = st.selectbox(
+            "Selecciona una serie histórica",
+            [metric["label"] for metric in available_historical_metrics],
+            key="historical_metric_selector",
         )
-        st.line_chart(df.set_index("date")["cvar_95_60d"], use_container_width=True)
-        st.caption("Evolución del riesgo de cola.")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    with col2:
-        st.markdown('<div class="panel-box">', unsafe_allow_html=True)
-        panel_header(
-            "Volatilidad (20d)",
-            "Volatilidad histórica",
-            "Esta serie recoge la volatilidad realizada a 20 días. Es una señal útil para seguir episodios de inestabilidad reciente."
+        selected_historical_metric = next(
+            metric
+            for metric in available_historical_metrics
+            if metric["label"] == selected_historical_label
         )
-        st.line_chart(df.set_index("date")["vol_20d"], use_container_width=True)
-        st.caption("Evolución de la variabilidad reciente del mercado.")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    col3, col4 = st.columns(2)
-
-    with col3:
-        st.markdown('<div class="panel-box">', unsafe_allow_html=True)
         panel_header(
-            "Drawdown",
-            "Drawdown histórico",
-            "El drawdown permite seguir la profundidad de las caídas acumuladas respecto al máximo más reciente. Resulta especialmente útil para detectar fases de deterioro prolongado."
+            selected_historical_metric["title"],
+            selected_historical_metric["info_title"],
+            selected_historical_metric["info_text"],
         )
-        st.line_chart(df.set_index("date")["drawdown"], use_container_width=True)
-        st.caption("Pérdidas acumuladas respecto a máximos previos.")
-        st.markdown("</div>", unsafe_allow_html=True)
-
-    with col4:
-        st.markdown('<div class="panel-box">', unsafe_allow_html=True)
-        panel_header(
-            "Asimetría (60d)",
-            "Asimetría histórica",
-            "La asimetría muestra si la distribución de rendimientos tiene más peso hacia la cola izquierda o derecha. En episodios de estrés suelen aparecer sesgos más negativos."
+        st.line_chart(
+            df.set_index("date")[selected_historical_metric["column"]],
+            use_container_width=True,
         )
-        st.line_chart(df.set_index("date")["skew_60d"], use_container_width=True)
-        st.caption("Asimetría de la distribución de rendimientos.")
+        st.caption(selected_historical_metric["caption"])
         st.markdown("</div>", unsafe_allow_html=True)
+    else:
+        st.warning("No hay series históricas disponibles para mostrar en esta sección.")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -836,16 +864,11 @@ with tab3:
     }
 
     st.markdown('<div class="panel-box">', unsafe_allow_html=True)
-    panel_header(
-        "Figuras de investigación",
-        "Figuras de investigación",
-        "Esta sección integra las figuras generadas en el pipeline analítico. Su función es complementar el dashboard con evidencia visual más cercana a la parte académica del proyecto."
-    )
+    st.subheader("Figuras de investigación")
 
     selected_figure = st.selectbox("Selecciona una figura", list(figure_options.keys()))
     selected_path = figure_options[selected_figure]["path"]
-
-    info_popover(selected_figure, figure_options[selected_figure]["info"])
+    st.caption(figure_options[selected_figure]["info"])
 
     if selected_path.exists():
         with open(selected_path, "rb") as f:
