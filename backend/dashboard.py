@@ -350,31 +350,58 @@ st.markdown(
         color: var(--white-soft) !important;
     }
 
-    div[data-baseweb="popover"] {
-        background: #171717 !important;
-        border: 1px solid rgba(214, 194, 168, 0.26) !important;
-        color: #f3ece3 !important;
-    }
-
-    div[data-baseweb="popover"] * {
-        color: #f3ece3 !important;
-    }
-
+    div[data-testid="stPopoverBody"],
+    div[data-testid="stPopoverBody"] > div,
+    div[data-baseweb="popover"],
+    div[data-baseweb="menu"],
     ul[role="listbox"] {
-        background: #171717 !important;
-        border: 1px solid rgba(214, 194, 168, 0.26) !important;
-        color: #f3ece3 !important;
+        background: #1f1c18 !important;
+        border: 1px solid rgba(214, 194, 168, 0.28) !important;
+        color: #f5efe6 !important;
+        box-shadow: 0 16px 36px rgba(0, 0, 0, 0.38) !important;
     }
 
+    div[data-testid="stPopoverBody"] p,
+    div[data-testid="stPopoverBody"] span,
+    div[data-testid="stPopoverBody"] div,
+    div[data-testid="stPopoverBody"] label,
+    div[data-testid="stPopoverBody"] option,
+    div[data-baseweb="popover"] p,
+    div[data-baseweb="popover"] span,
+    div[data-baseweb="popover"] div,
+    div[data-baseweb="popover"] label,
+    div[data-baseweb="popover"] option,
+    div[data-baseweb="menu"] p,
+    div[data-baseweb="menu"] span,
+    div[data-baseweb="menu"] div,
+    div[data-baseweb="menu"] label,
+    div[data-baseweb="menu"] option,
+    ul[role="listbox"] p,
+    ul[role="listbox"] span,
+    ul[role="listbox"] div,
+    ul[role="listbox"] label,
+    ul[role="listbox"] option,
+    li[role="option"] p,
+    li[role="option"] span,
+    li[role="option"] div,
+    li[role="option"] label,
+    li[role="option"] option {
+        color: #f5efe6 !important;
+    }
+
+    li[role="option"],
     ul[role="listbox"] li {
         background: transparent !important;
-        color: #f3ece3 !important;
+        color: #f5efe6 !important;
+        border-radius: 10px !important;
     }
 
+    li[role="option"][aria-selected="true"],
     ul[role="listbox"] li[aria-selected="true"] {
-        background: rgba(214, 194, 168, 0.20) !important;
+        background: rgba(214, 194, 168, 0.24) !important;
     }
 
+    li[role="option"]:hover,
     ul[role="listbox"] li:hover {
         background: rgba(214, 194, 168, 0.16) !important;
     }
@@ -720,15 +747,6 @@ with tab2:
 
     st.markdown('<div class="panel-box">', unsafe_allow_html=True)
     panel_header(
-        "Dinámica histórica del riesgo",
-        "Nivel de riesgo histórico",
-        "Este bloque reúne el histórico completo de las métricas de riesgo para identificar fases de deterioro, normalización y persistencia del estrés."
-    )
-    st.caption("Serie completa cargada desde /historical-risk?limit=all.")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-    st.markdown('<div class="panel-box">', unsafe_allow_html=True)
-    panel_header(
         "Evolución del nivel de riesgo",
         "Nivel de riesgo histórico",
         "Este gráfico muestra la trayectoria histórica del indicador agregado de riesgo. Permite identificar fases de deterioro, normalización y persistencia del estrés."
@@ -818,14 +836,11 @@ with tab3:
     }
 
     st.markdown('<div class="panel-box">', unsafe_allow_html=True)
-    header_cols = st.columns([20, 1])
-    with header_cols[0]:
-        st.subheader("Figuras de investigación")
-    with header_cols[1]:
-        info_popover(
-            "Figuras de investigación",
-            "Esta sección integra las figuras generadas en el pipeline analítico. Su función es complementar el dashboard con evidencia visual más cercana a la parte académica del proyecto."
-        )
+    panel_header(
+        "Figuras de investigación",
+        "Figuras de investigación",
+        "Esta sección integra las figuras generadas en el pipeline analítico. Su función es complementar el dashboard con evidencia visual más cercana a la parte académica del proyecto."
+    )
 
     selected_figure = st.selectbox("Selecciona una figura", list(figure_options.keys()))
     selected_path = figure_options[selected_figure]["path"]
