@@ -435,15 +435,15 @@ def show_landing():
                     <div class="landing-content">
                         <div class="landing-kicker">Proyecto académico aplicado</div>
                         <div class="landing-title">Bienvenido a RISKBEX</div>
-                        <div class="landing-subline">TFM to applied portfolio prototype</div>
+                        <div class="landing-subline">TFM to applied risk monitoring dashboard</div>
                         <div class="landing-author">Desarrollado por Alex Palomo</div>
                         <div class="landing-subtitle">
-                            RISKBEX es la capa de presentación de un proyecto académico centrado en el análisis de riesgo de cartera y en la optimización dinámica. El sistema construye variables de riesgo de mercado a partir de datos del IBEX 35, evalúa las condiciones de deterioro mediante medidas como la volatilidad, el drawdown y el Conditional Value at Risk, y evoluciona hacia un marco de asignación apoyado en machine learning capaz de ajustar los pesos de la cartera automáticamente con el objetivo de minimizar el riesgo de cola.
+                            RISKBEX es la capa de presentación de un proyecto académico centrado en la monitorización interpretable del riesgo extremo del IBEX 35. El sistema construye variables de riesgo de mercado a partir de datos del índice y evalúa las condiciones de deterioro mediante medidas como la volatilidad, el drawdown y el Conditional Value at Risk para facilitar el seguimiento del entorno de riesgo.
                         </div>
                         <div class="landing-badges">
                             <span class="landing-badge">Tail Risk</span>
                             <span class="landing-badge">Market Regimes</span>
-                            <span class="landing-badge">Dynamic Allocation</span>
+                            <span class="landing-badge">Risk Monitoring</span>
                         </div>
                         <div class="landing-hint">
                             Haz clic en cualquier parte para entrar al dashboard
@@ -588,7 +588,7 @@ st.markdown(
     <div class="topbar">
         <div class="topbar-title">RISKBEX</div>
         <div class="topbar-subtitle">
-            Monitor de riesgo de mercado y análisis dinámico de cartera sobre el IBEX 35 · Última actualización disponible: <b>{data['date']}</b>
+            Monitor interpretable de riesgo extremo del IBEX 35 · Última actualización disponible: <b>{data['date']}</b>
         </div>
     </div>
     """,
@@ -660,7 +660,7 @@ with tab1:
     panel_header(
         "Cómo leer este dashboard",
         "Interpretación general",
-        "Esta vista resume el estado actual del mercado a través de un régimen, un nivel agregado de riesgo y varias métricas clave. La lógica general es simple: cuanto mayores son la volatilidad, el drawdown y el riesgo de cola, más adverso es el entorno para una cartera."
+        "Esta vista resume el estado actual del mercado a través de un régimen, un nivel agregado de riesgo y varias métricas clave. La lógica general es simple: cuanto mayores son la volatilidad, el drawdown y el riesgo de cola, más adverso es el entorno de mercado."
     )
 
     if data["risk_score"] > 70:
@@ -802,7 +802,7 @@ with tab3:
 st.markdown(
     """
     <div class="footer-note">
-        RISKBEX conecta datos de mercado, métricas de riesgo y análisis de régimen dentro de un marco orientado a cartera.
+        RISKBEX conecta datos de mercado, métricas de riesgo y análisis de régimen para monitorizar el riesgo extremo del IBEX 35.
     </div>
     """,
     unsafe_allow_html=True,
