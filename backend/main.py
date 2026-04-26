@@ -3,6 +3,8 @@ from typing import Optional
 import pandas as pd
 from pathlib import Path
 
+from src.risk_model import classify_regime, compute_risk_score
+
 app = FastAPI()
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -14,21 +16,6 @@ def load_data():
     df = df.sort_values("date").reset_index(drop=True)
     return df
 
-
-def classify_regime(row):
-    if row["vol_20d"] > 0.02 or row["drawdown"] < -0.20:
-        return "stress"
-    elif row["vol_20d"] > 0.012 or row["drawdown"] < -0.10:
-        return "turbulence"
-    else:
-        return "calm"
-
-
-def compute_risk_score(row):
-    vol_score = min(max(row["vol_20d"] / 0.03, 0), 1) * 40
-    cvar_score = min(max(abs(row["cvar_95_60d"]) / 0.08, 0), 1) * 35
-    drawdown_score = min(max(abs(row["drawdown"]) / 0.50, 0), 1) * 25
-    return round(vol_score + cvar_score + drawdown_score)
 
 
 @app.get("/health")
