@@ -338,86 +338,27 @@ st.markdown(
         box-shadow: var(--shadow);
     }
 
-    .stSelectbox > div > div {
-        background-color: rgba(214, 194, 168, 0.08);
+    .stRadio > div {
+        background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(214,194,168,0.04));
         border: 1px solid var(--border);
-        border-radius: 14px;
-        color: var(--white-soft);
+        border-radius: 16px;
+        padding: 0.55rem 0.75rem;
+        margin-bottom: 0.85rem;
     }
 
-    .stSelectbox [data-baseweb="select"] > div {
-        background-color: rgba(214, 194, 168, 0.08) !important;
-        color: var(--white-soft) !important;
+    .stRadio [role="radiogroup"] {
+        gap: 0.35rem;
     }
 
-    .stSelectbox [data-baseweb="select"] [data-testid="stMarkdownContainer"] p,
-    .stSelectbox [data-baseweb="select"] span,
-    .stSelectbox [data-baseweb="select"] div {
+    .stRadio [role="radio"] {
+        background: rgba(214, 194, 168, 0.08);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 0.4rem 0.9rem;
+    }
+
+    .stRadio [role="radio"] * {
         color: #f5efe6 !important;
-    }
-
-    div[data-testid="stPopoverBody"],
-    div[data-testid="stPopoverBody"] > div,
-    div[data-baseweb="popover"],
-    div[data-baseweb="menu"],
-    ul[role="listbox"] {
-        background: #1f1c18 !important;
-        border: 1px solid rgba(214, 194, 168, 0.28) !important;
-        color: #f5efe6 !important;
-        box-shadow: 0 16px 36px rgba(0, 0, 0, 0.38) !important;
-    }
-
-    div[data-testid="stPopoverBody"] p,
-    div[data-testid="stPopoverBody"] span,
-    div[data-testid="stPopoverBody"] div,
-    div[data-testid="stPopoverBody"] label,
-    div[data-testid="stPopoverBody"] option,
-    div[data-baseweb="popover"] p,
-    div[data-baseweb="popover"] span,
-    div[data-baseweb="popover"] div,
-    div[data-baseweb="popover"] label,
-    div[data-baseweb="popover"] option,
-    div[data-baseweb="menu"] p,
-    div[data-baseweb="menu"] span,
-    div[data-baseweb="menu"] div,
-    div[data-baseweb="menu"] label,
-    div[data-baseweb="menu"] option,
-    ul[role="listbox"] p,
-    ul[role="listbox"] span,
-    ul[role="listbox"] div,
-    ul[role="listbox"] label,
-    ul[role="listbox"] option,
-    li[role="option"] p,
-    li[role="option"] span,
-    li[role="option"] div,
-    li[role="option"] label,
-    li[role="option"] option {
-        color: #f5efe6 !important;
-    }
-
-    li[role="option"],
-    ul[role="listbox"] li {
-        background: transparent !important;
-        color: #f5efe6 !important;
-        border-radius: 10px !important;
-    }
-
-    li[role="option"] *,
-    ul[role="listbox"] li *,
-    div[data-baseweb="menu"] li *,
-    div[data-baseweb="popover"] li * {
-        color: #f5efe6 !important;
-        opacity: 1 !important;
-    }
-
-    li[role="option"][aria-selected="true"],
-    ul[role="listbox"] li[aria-selected="true"] {
-        background: rgba(214, 194, 168, 0.24) !important;
-    }
-
-    li[role="option"]:hover,
-    ul[role="listbox"] li:hover {
-        background: rgba(214, 194, 168, 0.16) !important;
     }
 
     .footer-note {
@@ -679,7 +620,6 @@ st.markdown(
 tab1, tab2, tab3 = st.tabs(["Visión general", "Análisis histórico", "Figuras de investigación"])
 
 with tab1:
-    st.markdown('<div class="tab-panel">', unsafe_allow_html=True)
     st.markdown('<div class="section-title">Estado actual del mercado</div>', unsafe_allow_html=True)
 
     regime_cols = st.columns([20, 1])
@@ -737,7 +677,6 @@ with tab1:
             with inner_right:
                 info_popover(metric_infos[i][0], metric_infos[i][1])
 
-    st.markdown('<div class="panel-box">', unsafe_allow_html=True)
     panel_header(
         "Cómo leer este dashboard",
         "Interpretación general",
@@ -753,11 +692,8 @@ with tab1:
 
     st.progress(max(0.0, min(float(data["risk_score"]) / 100, 1.0)))
     st.caption("Intensidad actual del indicador agregado de riesgo.")
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
 
 with tab2:
-    st.markdown('<div class="tab-panel">', unsafe_allow_html=True)
     historical_metric_options = [
         {
             "label": "Nivel de riesgo",
@@ -806,10 +742,10 @@ with tab2:
     ]
 
     if available_historical_metrics:
-        st.markdown('<div class="panel-box">', unsafe_allow_html=True)
-        selected_historical_label = st.selectbox(
-            "Selecciona una serie histórica",
+        selected_historical_label = st.radio(
+            "Serie histórica",
             [metric["label"] for metric in available_historical_metrics],
+            horizontal=True,
             key="historical_metric_selector",
         )
         selected_historical_metric = next(
@@ -827,15 +763,10 @@ with tab2:
             use_container_width=True,
         )
         st.caption(selected_historical_metric["caption"])
-        st.markdown("</div>", unsafe_allow_html=True)
     else:
         st.warning("No hay series históricas disponibles para mostrar en esta sección.")
 
-    st.markdown("</div>", unsafe_allow_html=True)
-
 with tab3:
-    st.markdown('<div class="tab-panel">', unsafe_allow_html=True)
-
     figure_options = {
         "Rendimientos diarios": {
             "path": FIGURES_DIR / "daily_returns_ibex35.png",
@@ -863,10 +794,14 @@ with tab3:
         },
     }
 
-    st.markdown('<div class="panel-box">', unsafe_allow_html=True)
     st.subheader("Figuras de investigación")
 
-    selected_figure = st.selectbox("Selecciona una figura", list(figure_options.keys()))
+    selected_figure = st.radio(
+        "Figura",
+        list(figure_options.keys()),
+        horizontal=True,
+        key="figure_selector",
+    )
     selected_path = figure_options[selected_figure]["path"]
     st.caption(figure_options[selected_figure]["info"])
 
@@ -880,9 +815,6 @@ with tab3:
         )
     else:
         st.warning(f"No se encontró la figura: {selected_path}")
-
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown(
     """
