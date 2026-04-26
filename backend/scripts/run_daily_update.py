@@ -18,6 +18,7 @@ FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
 RAW_OUTPUT = RAW_DATA_DIR / "ibex_prices.csv"
 PROCESSED_OUTPUT = PROCESSED_DATA_DIR / "dataset_cap3_master.csv"
+CAP4_OUTPUT = PROCESSED_DATA_DIR / "dataset_cap4_input.csv"
 
 # =========================
 # PARAMETERS
@@ -27,6 +28,7 @@ START_DATE = "2002-01-01"
 SHORT_WINDOW = 20
 MEDIUM_WINDOW = 60
 VAR_TAIL_PROB = 0.05
+EWMA_LAMBDA = 0.94
 
 # =========================
 # HELPERS
@@ -137,6 +139,11 @@ df["cvar_95_60d"] = df["ret_1d"].rolling(
     min_periods=MEDIUM_WINDOW
 ).apply(lambda x: historical_cvar(x), raw=True)
 
+# EWMA volatility (daily scale)
+df["ewma_vol"] = np.sqrt(
+    df["ret_1d"].pow(2).ewm(alpha=1 - EWMA_LAMBDA, adjust=False).mean()
+)
+
 # drawdown
 running_max = df["ibex_close"].cummax()
 df["drawdown"] = df["ibex_close"] / running_max - 1.0
@@ -163,6 +170,7 @@ feature_columns = [
     "downside_vol_60d",
     "var_95_60d",
     "cvar_95_60d",
+    "ewma_vol",
     "drawdown",
     "skew_60d",
     "ret_risk_20d",
@@ -174,6 +182,12 @@ master_df = master_df.dropna(subset=feature_columns).reset_index(drop=True)
 master_df = master_df.sort_values("date").reset_index(drop=True)
 
 master_df.to_csv(PROCESSED_OUTPUT, index=False)
+
+if CAP4_OUTPUT.exists():
+    master_df.to_csv(CAP4_OUTPUT, index=False)
+    print(f"Cap4 input exported to: {CAP4_OUTPUT}")
+else:
+    print(f"Cap4 input not found, skipping export: {CAP4_OUTPUT}")
 
 print(f"Processed data exported to: {PROCESSED_OUTPUT}")
 print(f"Processed shape: {master_df.shape}")
