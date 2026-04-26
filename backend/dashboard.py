@@ -342,6 +342,41 @@ st.markdown(
         background-color: rgba(214, 194, 168, 0.08);
         border: 1px solid var(--border);
         border-radius: 14px;
+        color: var(--white-soft);
+    }
+
+    .stSelectbox [data-baseweb="select"] > div {
+        background-color: rgba(214, 194, 168, 0.08) !important;
+        color: var(--white-soft) !important;
+    }
+
+    div[data-baseweb="popover"] {
+        background: #171717 !important;
+        border: 1px solid rgba(214, 194, 168, 0.26) !important;
+        color: #f3ece3 !important;
+    }
+
+    div[data-baseweb="popover"] * {
+        color: #f3ece3 !important;
+    }
+
+    ul[role="listbox"] {
+        background: #171717 !important;
+        border: 1px solid rgba(214, 194, 168, 0.26) !important;
+        color: #f3ece3 !important;
+    }
+
+    ul[role="listbox"] li {
+        background: transparent !important;
+        color: #f3ece3 !important;
+    }
+
+    ul[role="listbox"] li[aria-selected="true"] {
+        background: rgba(214, 194, 168, 0.20) !important;
+    }
+
+    ul[role="listbox"] li:hover {
+        background: rgba(214, 194, 168, 0.16) !important;
     }
 
     .footer-note {
@@ -355,6 +390,11 @@ st.markdown(
         border: 1px solid rgba(214, 194, 168, 0.22) !important;
         border-radius: 18px !important;
         box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35) !important;
+    }
+
+    div[data-testid="stPopoverContent"] {
+        background: #161616 !important;
+        border: 1px solid rgba(214, 194, 168, 0.22) !important;
     }
 
     div[data-testid="stPopover"] * {
@@ -436,7 +476,7 @@ def show_landing():
                         <div class="landing-kicker">Proyecto académico aplicado</div>
                         <div class="landing-title">Bienvenido a RISKBEX</div>
                         <div class="landing-subline">TFM to applied risk monitoring dashboard</div>
-                        <div class="landing-author">Desarrollado por Alex Palomo</div>
+                        <div class="landing-author">Desarrollado por Alejandro Palomo Morales</div>
                         <div class="landing-subtitle">
                             RISKBEX es la capa de presentación de un proyecto académico centrado en la monitorización interpretable del riesgo extremo del IBEX 35. El sistema construye variables de riesgo de mercado a partir de datos del índice y evalúa las condiciones de deterioro mediante medidas como la volatilidad, el drawdown y el Conditional Value at Risk para facilitar el seguimiento del entorno de riesgo.
                         </div>
@@ -521,7 +561,7 @@ def load_latest_data():
 
 @st.cache_data(ttl=30)
 def load_historical_data():
-    response = requests.get(f"{API_URL}/historical-risk", timeout=10)
+    response = requests.get(f"{API_URL}/historical-risk?limit=all", timeout=10)
     response.raise_for_status()
     hist_data = response.json()
     df = pd.DataFrame(hist_data)
@@ -677,7 +717,15 @@ with tab1:
 
 with tab2:
     st.markdown('<div class="tab-panel">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">Dinámica histórica del riesgo</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="panel-box">', unsafe_allow_html=True)
+    panel_header(
+        "Dinámica histórica del riesgo",
+        "Nivel de riesgo histórico",
+        "Este bloque reúne el histórico completo de las métricas de riesgo para identificar fases de deterioro, normalización y persistencia del estrés."
+    )
+    st.caption("Serie completa cargada desde /historical-risk?limit=all.")
+    st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown('<div class="panel-box">', unsafe_allow_html=True)
     panel_header(
@@ -741,7 +789,6 @@ with tab2:
 
 with tab3:
     st.markdown('<div class="tab-panel">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">Figuras de investigación</div>', unsafe_allow_html=True)
 
     figure_options = {
         "Rendimientos diarios": {
@@ -773,7 +820,7 @@ with tab3:
     st.markdown('<div class="panel-box">', unsafe_allow_html=True)
     header_cols = st.columns([20, 1])
     with header_cols[0]:
-        st.subheader("Explorador de figuras")
+        st.subheader("Figuras de investigación")
     with header_cols[1]:
         info_popover(
             "Figuras de investigación",
