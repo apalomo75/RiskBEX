@@ -3,7 +3,12 @@ from typing import Optional
 import pandas as pd
 from pathlib import Path
 
-from src.risk_model import classify_regime, compute_risk_score
+from src.risk_model import (
+    classify_regime,
+    compute_risk_score,
+    get_risk_level_with_fallback,
+    get_risk_score_with_fallback,
+)
 
 app = FastAPI()
 
@@ -27,6 +32,8 @@ def health():
 def latest_risk():
     df = load_data()
     latest = df.iloc[-1]
+    risk_score = get_risk_score_with_fallback(latest)
+    risk_level = get_risk_level_with_fallback(latest)
 
     return {
         "date": latest["date"].strftime("%Y-%m-%d"),
@@ -37,7 +44,8 @@ def latest_risk():
         "drawdown": float(latest["drawdown"]),
         "skew_60d": float(latest["skew_60d"]),
         "regime_label": classify_regime(latest),
-        "risk_score": compute_risk_score(latest),
+        "risk_score": risk_score,
+        "risk_level": risk_level,
     }
 
 
@@ -45,7 +53,12 @@ def latest_risk():
 def historical_risk(limit: Optional[str] = None):
     df = load_data().copy()
     df["regime_label"] = df.apply(classify_regime, axis=1)
-    df["risk_score"] = df.apply(compute_risk_score, axis=1)
+    if "risk_score" in df.columns:
+        df["risk_score"] = df.apply(get_risk_score_with_fallback, axis=1)
+    else:
+        df["risk_score"] = df.apply(compute_risk_score, axis=1)
+
+    df["risk_level"] = df.apply(get_risk_level_with_fallback, axis=1)
 
     cols = [
         "date",
@@ -57,6 +70,7 @@ def historical_risk(limit: Optional[str] = None):
         "skew_60d",
         "regime_label",
         "risk_score",
+        "risk_level",
     ]
 
     default_limit = 250

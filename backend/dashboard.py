@@ -621,6 +621,7 @@ tab1, tab2, tab3 = st.tabs(["Visión general", "Análisis histórico", "Figuras 
 
 with tab1:
     st.markdown('<div class="section-title">Estado actual del mercado</div>', unsafe_allow_html=True)
+    risk_level_text = str(data.get("risk_level", "")).capitalize() if data.get("risk_level") else "N/D"
 
     regime_cols = st.columns([20, 1])
     with regime_cols[0]:
@@ -641,7 +642,7 @@ with tab1:
         f"{data['cvar_95_60d']:.2%}",
         f"{data['drawdown']:.2%}",
         f"{data['vol_20d']:.2%}",
-        f"{int(data['risk_score'])} / 100",
+        f"{int(data['risk_score'])} / 100 · {risk_level_text}",
     ]
     metric_notes = [
         "Pérdida esperada en escenarios adversos.",
@@ -664,7 +665,7 @@ with tab1:
         ),
         (
             "Nivel de riesgo",
-            "El nivel de riesgo es un indicador compuesto entre 0 y 100 diseñado para resumir el estado actual del mercado. Integra señales de volatilidad, drawdown y riesgo de cola para ofrecer una lectura rápida e interpretable."
+            "El indicador de riesgo mide la posición relativa histórica del riesgo de mercado en escala 0-100 usando percentiles históricos expanding. Combina EWMA volatility, CVaR, drawdown y downside volatility. Un valor 0 representa riesgo relativo bajo y 100 riesgo extremo relativo. No predice retornos ni constituye señal de compra o venta."
         ),
     ]
 
@@ -680,7 +681,7 @@ with tab1:
     panel_header(
         "Cómo leer este dashboard",
         "Interpretación general",
-        "Esta vista resume el estado actual del mercado a través de un régimen, un nivel agregado de riesgo y varias métricas clave. La lógica general es simple: cuanto mayores son la volatilidad, el drawdown y el riesgo de cola, más adverso es el entorno de mercado."
+        "Esta vista resume el estado actual del mercado mediante un régimen y un indicador agregado de riesgo relativo histórico (0-100). Cuanto mayor es el indicador, más extremo es el entorno de riesgo frente a su propia historia."
     )
 
     if data["risk_score"] > 70:
