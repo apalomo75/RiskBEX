@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   daily-update:
@@ -28,16 +28,3 @@ jobs:
         run: |
           cd backend
           python scripts/run_daily_update.py
-
-      - name: Commit and push updated CSV/figures
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          if git status --porcelain -- '*.csv' '*.png' '*.jpg' '*.jpeg' '*.svg' '*.pdf' | grep -q .; then
-            git add -A '*.csv' '*.png' '*.jpg' '*.jpeg' '*.svg' '*.pdf'
-            git commit -m "chore: update daily data artifacts"
-            git push
-          else
-            echo "No CSV/figure changes to commit"
-          fi
