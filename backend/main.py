@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from typing import Optional
 import pandas as pd
 from pathlib import Path
 
@@ -54,7 +55,7 @@ def latest_risk():
 
 
 @app.get("/historical-risk")
-def historical_risk():
+def historical_risk(limit: Optional[str] = None):
     df = load_data().copy()
     df["regime_label"] = df.apply(classify_regime, axis=1)
     df["risk_score"] = df.apply(compute_risk_score, axis=1)
@@ -71,5 +72,22 @@ def historical_risk():
         "risk_score",
     ]
 
+    default_limit = 250
+    records_limit = default_limit
+
+    if limit is not None:
+        if limit.lower() == "all":
+            records_limit = None
+        else:
+            try:
+                parsed_limit = int(limit)
+                if parsed_limit > 0:
+                    records_limit = parsed_limit
+            except (TypeError, ValueError):
+                records_limit = default_limit
+
     df["date"] = df["date"].dt.strftime("%Y-%m-%d")
-    return df[cols].tail(250).to_dict(orient="records")
+    if records_limit is None:
+        return df[cols].to_dict(orient="records")
+
+    return df[cols].tail(records_limit).to_dict(orient="records")
