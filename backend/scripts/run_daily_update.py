@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 # =========================
 # PATHS
 # =========================
-PROJECT_ROOT = Path("/home/apalo/projects/RiskBEX/backend")
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 RAW_DATA_DIR = PROJECT_ROOT / "data" / "raw"
 PROCESSED_DATA_DIR = PROJECT_ROOT / "data" / "processed"
 FIGURES_DIR = PROJECT_ROOT / "figures" / "chapter2"

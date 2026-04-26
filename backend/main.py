@@ -4,7 +4,8 @@ from pathlib import Path
 
 app = FastAPI()
 
-DATA_PATH = Path("/home/apalo/projects/RiskBEX/backend/data/processed/dataset_cap3_master.csv")
+BASE_DIR = Path(__file__).resolve().parent
+DATA_PATH = BASE_DIR / "data" / "processed" / "dataset_cap3_master.csv"
 
 
 def load_data():
