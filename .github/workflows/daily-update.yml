@@ -1,0 +1,43 @@
+name: Daily RISKBEX Update
+
+on:
+  schedule:
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  daily-update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Run daily update pipeline
+        run: |
+          cd backend
+          python scripts/run_daily_update.py
+
+      - name: Commit and push updated CSV/figures
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git status --porcelain -- '*.csv' '*.png' '*.jpg' '*.jpeg' '*.svg' '*.pdf' | grep -q .; then
+            git add -A '*.csv' '*.png' '*.jpg' '*.jpeg' '*.svg' '*.pdf'
+            git commit -m "chore: update daily data artifacts"
+            git push
+          else
+            echo "No CSV/figure changes to commit"
+          fi
