@@ -586,8 +586,25 @@ with left_btn:
 
 with right_btn:
     if st.button("Actualizar datos"):
-        st.cache_data.clear()
-        st.rerun()
+        with st.spinner("Actualizando datos..."):
+            try:
+                response = requests.post(f"{API_URL}/run-update", timeout=320)
+                response.raise_for_status()
+                update_result = response.json()
+            except Exception as e:
+                st.error("No se pudo actualizar el sistema.")
+                if getattr(e, "response", None) is not None:
+                    try:
+                        error_payload = e.response.json()
+                        st.code(error_payload.get("stderr") or error_payload.get("message") or str(error_payload))
+                    except Exception:
+                        st.code(e.response.text)
+                else:
+                    st.code(str(e))
+            else:
+                st.success("Datos actualizados correctamente.")
+                st.cache_data.clear()
+                st.rerun()
 
 try:
     data = load_latest_data()

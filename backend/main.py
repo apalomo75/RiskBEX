@@ -1,8 +1,11 @@
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from typing import Optional
-import pandas as pd
 from pathlib import Path
+import subprocess
+import sys
 
+from src.riskbex.data.loaders import load_master_dataset
 from src.risk_model import (
     classify_regime,
     compute_risk_score,
@@ -13,19 +16,66 @@ from src.risk_model import (
 app = FastAPI()
 
 BASE_DIR = Path(__file__).resolve().parent
-DATA_PATH = BASE_DIR / "data" / "processed" / "dataset_cap3_master.csv"
+PROJECT_ROOT = BASE_DIR
 
 
 def load_data():
-    df = pd.read_csv(DATA_PATH, parse_dates=["date"])
-    df = df.sort_values("date").reset_index(drop=True)
-    return df
+    return load_master_dataset()
 
 
 
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.post("/run-update")
+def run_update():
+    try:
+        result = subprocess.run(
+            [sys.executable, "scripts/run_daily_update.py"],
+            cwd=PROJECT_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+    except subprocess.TimeoutExpired as exc:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": "Pipeline update timed out.",
+                "stdout": exc.stdout or "",
+                "stderr": exc.stderr or "",
+                "returncode": None,
+            },
+        )
+    except Exception as exc:
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "message": str(exc),
+                "stdout": "",
+                "stderr": "",
+                "returncode": None,
+            },
+        )
+
+    response = {
+        "status": "success" if result.returncode == 0 else "error",
+        "message": "Pipeline update completed successfully."
+        if result.returncode == 0
+        else "Pipeline update failed.",
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+        "returncode": result.returncode,
+    }
+
+    if result.returncode != 0:
+        return JSONResponse(status_code=500, content=response)
+
+    return response
 
 
 @app.get("/latest-risk")
