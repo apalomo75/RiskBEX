@@ -5,6 +5,12 @@ from pathlib import Path
 import subprocess
 import sys
 
+from src.riskbex.api.schemas import (
+    HealthResponse,
+    HistoricalRiskPoint,
+    LatestRiskResponse,
+    RunUpdateResponse,
+)
 from src.riskbex.data.loaders import load_master_dataset
 from src.riskbex.regimes.heuristic import classify_regime, compute_risk_score
 from src.risk_model import (
@@ -23,12 +29,12 @@ def load_data():
 
 
 
-@app.get("/health")
+@app.get("/health", response_model=HealthResponse)
 def health():
     return {"status": "ok"}
 
 
-@app.post("/run-update")
+@app.post("/run-update", response_model=RunUpdateResponse)
 def run_update():
     try:
         result = subprocess.run(
@@ -77,7 +83,7 @@ def run_update():
     return response
 
 
-@app.get("/latest-risk")
+@app.get("/latest-risk", response_model=LatestRiskResponse)
 def latest_risk():
     df = load_data()
     latest = df.iloc[-1]
@@ -98,7 +104,7 @@ def latest_risk():
     }
 
 
-@app.get("/historical-risk")
+@app.get("/historical-risk", response_model=list[HistoricalRiskPoint])
 def historical_risk(limit: Optional[str] = None):
     df = load_data().copy()
     df["regime_label"] = df.apply(classify_regime, axis=1)
