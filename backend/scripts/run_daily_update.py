@@ -1,156 +1,65 @@
 from pathlib import Path
+import sys
+
 import numpy as np
 import pandas as pd
 import yfinance as yf
-import matplotlib.pyplot as plt
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.riskbex.config import (
+    EWMA_LAMBDA,
+    MAIN_TEST_START,
+    ROBUST_TEST_START,
+    ROLLING_LONG_WINDOW,
+    ROLLING_SHORT_WINDOW,
+    START_DATE,
+    TICKER,
+)
+from src.riskbex.features.downside import compute_downside_volatility
+from src.riskbex.features.drawdown import compute_drawdown
+from src.riskbex.features.returns import (
+    compute_log_returns,
+    compute_risk_adjusted_return,
+    compute_rolling_return,
+)
+from src.riskbex.features.scoring import compute_risk_score
+from src.riskbex.features.tail_risk import (
+    compute_historical_cvar,
+    compute_historical_var,
+)
+from src.riskbex.features.volatility import compute_ewma_volatility
+from src.riskbex.paths import (
+    CAP4_INPUT_PATH,
+    CHAPTER2_FIGURES_DIR,
+    MASTER_DATASET_PATH,
+    PROCESSED_DATA_DIR,
+    RAW_DATA_DIR,
+    RAW_PRICES_PATH,
+)
+from src.riskbex.reporting.figures import generate_chapter2_figures
 
 # =========================
 # PATHS
 # =========================
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-RAW_DATA_DIR = PROJECT_ROOT / "data" / "raw"
-PROCESSED_DATA_DIR = PROJECT_ROOT / "data" / "processed"
-FIGURES_DIR = PROJECT_ROOT / "figures" / "chapter2"
+FIGURES_DIR = CHAPTER2_FIGURES_DIR
 
 RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
 PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
 FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
-RAW_OUTPUT = RAW_DATA_DIR / "ibex_prices.csv"
-PROCESSED_OUTPUT = PROCESSED_DATA_DIR / "dataset_cap3_master.csv"
-CAP4_OUTPUT = PROCESSED_DATA_DIR / "dataset_cap4_input.csv"
+RAW_OUTPUT = RAW_PRICES_PATH
+PROCESSED_OUTPUT = MASTER_DATASET_PATH
+CAP4_OUTPUT = CAP4_INPUT_PATH
 
 # =========================
 # PARAMETERS
 # =========================
-TICKER = "^IBEX"
-START_DATE = "2000-01-01"
-SHORT_WINDOW = 20
-MEDIUM_WINDOW = 60
+SHORT_WINDOW = ROLLING_SHORT_WINDOW
+MEDIUM_WINDOW = ROLLING_LONG_WINDOW
 VAR_TAIL_PROB = 0.05
-EWMA_LAMBDA = 0.94
-BURN_IN_OBS = 252
-
-RISK_WEIGHTS = {
-    "vol_score": 0.30,
-    "cvar_score": 0.30,
-    "drawdown_score": 0.25,
-    "downside_score": 0.15,
-}
-
-# =========================
-# HELPERS
-# =========================
-def downside_volatility(series: pd.Series) -> float:
-    negative_returns = series[series < 0]
-    if len(negative_returns) == 0:
-        return np.nan
-    return negative_returns.std(ddof=1)
-
-
-def historical_var(series: np.ndarray, alpha: float = VAR_TAIL_PROB) -> float:
-    return np.quantile(series, alpha)
-
-
-def historical_cvar(series: np.ndarray, alpha: float = VAR_TAIL_PROB) -> float:
-    var_threshold = np.quantile(series, alpha)
-    tail_losses = series[series <= var_threshold]
-    return tail_losses.mean() if len(tail_losses) > 0 else np.nan
-
-
-def historical_percentile_midrank(
-    value: float,
-    history: pd.Series,
-) -> float:
-    valid_history = history.dropna()
-    if pd.isna(value) or valid_history.empty:
-        return np.nan
-
-    lower_count = (valid_history < value).sum()
-    equal_count = (valid_history == value).sum()
-    return (lower_count + 0.5 * equal_count) / len(valid_history)
-
-
-def assign_risk_level(score: float):
-    if pd.isna(score):
-        return np.nan
-    if score <= 33:
-        return "bajo"
-    if score <= 66:
-        return "medio"
-    return "alto"
-
-
-def compute_risk_score(df: pd.DataFrame) -> pd.DataFrame:
-    required_columns = ["ewma_vol", "cvar_95_60d", "drawdown", "downside_vol_60d"]
-    for col in required_columns:
-        if col not in df.columns:
-            raise ValueError(f"Missing required column for risk score computation: {col}")
-
-    df = df.copy()
-    component_scores = {
-        "vol_score": [],
-        "cvar_score": [],
-        "drawdown_score": [],
-        "downside_score": [],
-    }
-    aggregate_scores = []
-
-    for idx in range(len(df)):
-        vol_value = df.at[idx, "ewma_vol"]
-        cvar_value = df.at[idx, "cvar_95_60d"]
-        drawdown_value = df.at[idx, "drawdown"]
-        downside_value = df.at[idx, "downside_vol_60d"]
-
-        if pd.isna(vol_value) or pd.isna(cvar_value) or pd.isna(drawdown_value) or pd.isna(downside_value):
-            for key in component_scores:
-                component_scores[key].append(np.nan)
-            aggregate_scores.append(np.nan)
-            continue
-
-        history = df.iloc[:idx]
-        vol_hist = history["ewma_vol"]
-        cvar_hist = -history["cvar_95_60d"]
-        drawdown_hist = -history["drawdown"]
-        downside_hist = history["downside_vol_60d"]
-
-        min_history_size = min(
-            vol_hist.dropna().shape[0],
-            cvar_hist.dropna().shape[0],
-            drawdown_hist.dropna().shape[0],
-            downside_hist.dropna().shape[0],
-        )
-        if min_history_size < BURN_IN_OBS:
-            for key in component_scores:
-                component_scores[key].append(np.nan)
-            aggregate_scores.append(np.nan)
-            continue
-
-        vol_score = 100 * historical_percentile_midrank(vol_value, vol_hist)
-        cvar_score = 100 * historical_percentile_midrank(-cvar_value, cvar_hist)
-        drawdown_score = 100 * historical_percentile_midrank(-drawdown_value, drawdown_hist)
-        downside_score = 100 * historical_percentile_midrank(downside_value, downside_hist)
-
-        component_scores["vol_score"].append(vol_score)
-        component_scores["cvar_score"].append(cvar_score)
-        component_scores["drawdown_score"].append(drawdown_score)
-        component_scores["downside_score"].append(downside_score)
-
-        score_raw = (
-            RISK_WEIGHTS["vol_score"] * vol_score
-            + RISK_WEIGHTS["cvar_score"] * cvar_score
-            + RISK_WEIGHTS["drawdown_score"] * drawdown_score
-            + RISK_WEIGHTS["downside_score"] * downside_score
-        )
-        aggregate_scores.append(int(round(np.clip(score_raw, 0, 100))))
-
-    for col, values in component_scores.items():
-        df[col] = values
-
-    df["risk_score"] = aggregate_scores
-    df["risk_level"] = df["risk_score"].apply(assign_risk_level)
-    return df
-
 
 # =========================
 # STEP 1: DOWNLOAD IBEX
@@ -182,7 +91,7 @@ ibex["date"] = pd.to_datetime(ibex["date"])
 ibex = ibex.sort_values("date").reset_index(drop=True)
 
 # daily log returns
-ibex["ret_1d"] = np.log(ibex["ibex_close"] / ibex["ibex_close"].shift(1))
+ibex["ret_1d"] = compute_log_returns(ibex["ibex_close"])
 ibex = ibex.dropna(subset=["ret_1d"]).reset_index(drop=True)
 
 ibex.to_csv(RAW_OUTPUT, index=False)
@@ -195,18 +104,11 @@ print(f"Raw shape: {ibex.shape}")
 # =========================
 print("Computing risk features...")
 
-df = ibex.copy()
+df = ibex.set_index("date").copy()
 
 # performance features
-df["ret_20d"] = df["ret_1d"].rolling(
-    window=SHORT_WINDOW,
-    min_periods=SHORT_WINDOW
-).sum()
-
-df["ret_60d"] = df["ret_1d"].rolling(
-    window=MEDIUM_WINDOW,
-    min_periods=MEDIUM_WINDOW
-).sum()
+df["ret_20d"] = compute_rolling_return(df["ret_1d"], SHORT_WINDOW)
+df["ret_60d"] = compute_rolling_return(df["ret_1d"], MEDIUM_WINDOW)
 
 # volatility features
 df["vol_20d"] = df["ret_1d"].rolling(
@@ -220,35 +122,18 @@ df["vol_60d"] = df["ret_1d"].rolling(
 ).std(ddof=1)
 
 # downside risk
-df["downside_vol_20d"] = df["ret_1d"].rolling(
-    window=SHORT_WINDOW,
-    min_periods=SHORT_WINDOW
-).apply(downside_volatility, raw=False)
-
-df["downside_vol_60d"] = df["ret_1d"].rolling(
-    window=MEDIUM_WINDOW,
-    min_periods=MEDIUM_WINDOW
-).apply(downside_volatility, raw=False)
+df["downside_vol_20d"] = compute_downside_volatility(df["ret_1d"], SHORT_WINDOW)
+df["downside_vol_60d"] = compute_downside_volatility(df["ret_1d"], MEDIUM_WINDOW)
 
 # tail risk
-df["var_95_60d"] = df["ret_1d"].rolling(
-    window=MEDIUM_WINDOW,
-    min_periods=MEDIUM_WINDOW
-).apply(lambda x: historical_var(x), raw=True)
-
-df["cvar_95_60d"] = df["ret_1d"].rolling(
-    window=MEDIUM_WINDOW,
-    min_periods=MEDIUM_WINDOW
-).apply(lambda x: historical_cvar(x), raw=True)
+df["var_95_60d"] = compute_historical_var(df["ret_1d"], MEDIUM_WINDOW, VAR_TAIL_PROB)
+df["cvar_95_60d"] = compute_historical_cvar(df["ret_1d"], MEDIUM_WINDOW, VAR_TAIL_PROB)
 
 # EWMA volatility (daily scale)
-df["ewma_vol"] = np.sqrt(
-    df["ret_1d"].pow(2).ewm(alpha=1 - EWMA_LAMBDA, adjust=False).mean()
-)
+df["ewma_vol"] = compute_ewma_volatility(df["ret_1d"], EWMA_LAMBDA)
 
 # drawdown
-running_max = df["ibex_close"].cummax()
-df["drawdown"] = df["ibex_close"] / running_max - 1.0
+df["drawdown"] = compute_drawdown(df["ibex_close"])
 
 # skewness
 df["skew_60d"] = df["ret_1d"].rolling(
@@ -256,41 +141,49 @@ df["skew_60d"] = df["ret_1d"].rolling(
     min_periods=MEDIUM_WINDOW
 ).skew()
 
-# risk-adjusted return
-df["ret_risk_20d"] = df["ret_20d"] / df["vol_20d"]
-df["ret_risk_60d"] = df["ret_60d"] / df["vol_60d"]
-
 feature_columns = [
-    "date",
     "ibex_close",
     "ret_1d",
     "ret_20d",
     "ret_60d",
     "vol_20d",
     "vol_60d",
+    "ewma_vol",
     "downside_vol_20d",
     "downside_vol_60d",
     "var_95_60d",
     "cvar_95_60d",
-    "ewma_vol",
     "drawdown",
     "skew_60d",
-    "ret_risk_20d",
-    "ret_risk_60d",
 ]
 
-master_df = df[feature_columns].copy()
-master_df = master_df.dropna(subset=feature_columns).reset_index(drop=True)
-master_df = master_df.sort_values("date").reset_index(drop=True)
-master_df = compute_risk_score(master_df)
+master_base_df = df[feature_columns].copy()
+master_base_df = master_base_df.dropna(subset=feature_columns)
+master_base_df = master_base_df.reset_index()
+master_base_df = master_base_df.sort_values("date").reset_index(drop=True)
 
+master_base_df["sample_split_main"] = pd.Categorical(
+    np.where(master_base_df["date"] < pd.Timestamp(MAIN_TEST_START), "train", "test")
+)
+
+master_base_df["sample_split_robust"] = pd.Categorical(
+    np.where(master_base_df["date"] < pd.Timestamp(ROBUST_TEST_START), "train", "test")
+)
+
+master_base_df["ret_risk_20d"] = compute_risk_adjusted_return(
+    master_base_df["ret_20d"],
+    master_base_df["vol_20d"],
+)
+master_base_df["ret_risk_60d"] = compute_risk_adjusted_return(
+    master_base_df["ret_60d"],
+    master_base_df["vol_60d"],
+)
+
+master_base_df.to_csv(CAP4_OUTPUT, index=False)
+print(f"Cap4 input exported to: {CAP4_OUTPUT}")
+
+master_df = compute_risk_score(master_base_df)
 master_df.to_csv(PROCESSED_OUTPUT, index=False)
-
-if CAP4_OUTPUT.exists():
-    master_df.to_csv(CAP4_OUTPUT, index=False)
-    print(f"Cap4 input exported to: {CAP4_OUTPUT}")
-else:
-    print(f"Cap4 input not found, skipping export: {CAP4_OUTPUT}")
 
 print(f"Processed data exported to: {PROCESSED_OUTPUT}")
 print(f"Processed shape: {master_df.shape}")
@@ -300,74 +193,7 @@ print(f"Date coverage: {master_df['date'].min()} to {master_df['date'].max()}")
 # STEP 3: GENERATE FIGURES
 # =========================
 print("Generating figures...")
-
-master_df["date"] = pd.to_datetime(master_df["date"])
-
-# 1. Daily returns
-plt.figure(figsize=(12, 5))
-plt.plot(master_df["date"], master_df["ret_1d"], linewidth=0.8)
-plt.title("Daily log returns of the IBEX 35")
-plt.xlabel("Date")
-plt.ylabel("Log return")
-plt.tight_layout()
-plt.savefig(FIGURES_DIR / "daily_returns_ibex35.png", dpi=300)
-plt.close()
-
-# 2. Volatility vs downside volatility
-plt.figure(figsize=(12, 5))
-plt.plot(master_df["date"], master_df["vol_60d"], label="Volatility (60d)", linewidth=1)
-plt.plot(master_df["date"], master_df["downside_vol_60d"], label="Downside volatility (60d)", linewidth=1)
-plt.title("Volatility and downside volatility of the IBEX 35 (60-day window)")
-plt.xlabel("Date")
-plt.ylabel("Volatility")
-plt.legend()
-plt.tight_layout()
-plt.savefig(FIGURES_DIR / "volatility_vs_downside_60d.png", dpi=300)
-plt.close()
-
-# 3. Drawdown
-plt.figure(figsize=(12, 5))
-plt.plot(master_df["date"], master_df["drawdown"], linewidth=1)
-plt.title("Market drawdown of the IBEX 35")
-plt.xlabel("Date")
-plt.ylabel("Drawdown")
-plt.ylim(master_df["drawdown"].min() * 1.05, 0.05)
-plt.tight_layout()
-plt.savefig(FIGURES_DIR / "drawdown_ibex35.png", dpi=300)
-plt.close()
-
-# 4. VaR vs CVaR
-plt.figure(figsize=(12, 5))
-plt.plot(master_df["date"], master_df["var_95_60d"], label="VaR 95% (60d)", linewidth=1)
-plt.plot(master_df["date"], master_df["cvar_95_60d"], label="CVaR 95% (60d)", linewidth=1)
-plt.title("VaR and CVaR of the IBEX 35 (95%, 60-day window)")
-plt.xlabel("Date")
-plt.ylabel("Risk measure")
-plt.legend()
-plt.tight_layout()
-plt.savefig(FIGURES_DIR / "var_cvar_60d.png", dpi=300)
-plt.close()
-
-# 5. Skewness
-plt.figure(figsize=(10, 4))
-plt.plot(master_df["date"], master_df["skew_60d"])
-plt.title("Rolling skewness (60d)")
-plt.xlabel("Date")
-plt.ylabel("Skewness")
-plt.axhline(0, linestyle="--")
-plt.tight_layout()
-plt.savefig(FIGURES_DIR / "skew_60d_series.png", dpi=300)
-plt.close()
-
-# 6. Risk-adjusted return
-plt.figure(figsize=(8, 5))
-plt.plot(master_df["date"], master_df["ret_risk_60d"])
-plt.title("Risk-adjusted return (60-day window) of the IBEX 35")
-plt.xlabel("Date")
-plt.ylabel("Return / Volatility (60d)")
-plt.tight_layout()
-plt.savefig(FIGURES_DIR / "ret_risk_60d_series.png", dpi=300)
-plt.close()
+generate_chapter2_figures(master_df, FIGURES_DIR)
 
 print("Figures generated successfully.")
 print("Daily update completed successfully.")
