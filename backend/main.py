@@ -6,9 +6,8 @@ import subprocess
 import sys
 
 from src.riskbex.data.loaders import load_master_dataset
+from src.riskbex.regimes.heuristic import classify_regime, compute_risk_score
 from src.risk_model import (
-    classify_regime,
-    compute_risk_score,
     get_risk_level_with_fallback,
     get_risk_score_with_fallback,
 )
