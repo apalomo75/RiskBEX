@@ -4,6 +4,7 @@ from src.riskbex.config import REGIME_FEATURES, REGIME_SPLIT_COLUMN, REGIME_TRAI
 from src.riskbex.paths import (
     CAP4_INPUT_PATH,
     MASTER_DATASET_PATH,
+    PROCESSED_DATA_DIR,
     RAW_PRICES_PATH,
     REGIME_DATASET_PATH,
     REGIME_DURATION_SUMMARY_PATH,
@@ -27,6 +28,13 @@ def _validate_columns(df, required_columns, dataset_name):
         raise ValueError(
             f"Missing required {dataset_name} columns: {missing_columns}"
         )
+
+
+def _normalize_sample(sample):
+    normalized_sample = str(sample).lower()
+    if normalized_sample not in {"main", "robust"}:
+        raise ValueError("sample must be 'main' or 'robust'")
+    return normalized_sample
 
 
 def load_master_dataset():
@@ -127,5 +135,54 @@ def load_duration_summary():
             "max_duration_trading_days",
         ],
         "duration summary",
+    )
+    return df
+
+
+def load_clean_regime_dataset(sample: str = "main"):
+    normalized_sample = _normalize_sample(sample)
+    filename = (
+        "regime_dataset_main.csv"
+        if normalized_sample == "main"
+        else "regime_dataset_robust.csv"
+    )
+    df = _load_dataset(PROCESSED_DATA_DIR / filename)
+    split_column = (
+        "sample_split_main"
+        if normalized_sample == "main"
+        else "sample_split_robust"
+    )
+    _validate_columns(
+        df,
+        [
+            "date",
+            "ret_1d",
+            "ewma_vol",
+            "cvar_95_60d",
+            split_column,
+            "regime",
+            "regime_label",
+            "risk_order",
+            "p_regime_0",
+            "p_regime_1",
+            "p_regime_2",
+        ],
+        f"clean {normalized_sample} regime dataset",
+    )
+    return df
+
+
+def load_regime_exposure_mapping(sample: str = "main"):
+    normalized_sample = _normalize_sample(sample)
+    filename = (
+        "regime_exposure_mapping.csv"
+        if normalized_sample == "main"
+        else "regime_exposure_mapping_robust.csv"
+    )
+    df = _load_dataset(PROCESSED_DATA_DIR / filename)
+    _validate_columns(
+        df,
+        ["regime", "economic_label", "risk_order", "target_exposure"],
+        f"{normalized_sample} regime exposure mapping",
     )
     return df
