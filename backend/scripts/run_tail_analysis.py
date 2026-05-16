@@ -24,7 +24,7 @@ def print_analysis_summary(name, df):
         print(f"tail event counts: {df['stress_tail_event'].value_counts().to_dict()}")
 
 
-if __name__ == "__main__":
+def main():
     main_df, robust_df, metrics_df, thresholds_df = save_tail_outputs()
 
     print_analysis_summary("tail_analysis_main.csv", main_df)
@@ -39,3 +39,7 @@ if __name__ == "__main__":
     print(f"created tail_metrics.csv shape {metrics_df.shape}")
     print(metrics_df.to_string(index=False))
     print(f"saved_to: {TAIL_METRICS_PATH}")
+
+
+if __name__ == "__main__":
+    main()

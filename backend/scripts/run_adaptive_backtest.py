@@ -32,7 +32,7 @@ def print_backtest_summary(name, df):
         )
 
 
-if __name__ == "__main__":
+def main():
     main_df, robust_df, metrics_df = save_backtest_outputs()
 
     print_backtest_summary("adaptive_backtest_main.csv", main_df)
@@ -42,3 +42,7 @@ if __name__ == "__main__":
     print(f"created adaptive_backtest_metrics.csv shape {metrics_df.shape}")
     print(metrics_df.to_string(index=False))
     print(f"saved_to: {BACKTEST_METRICS_PATH}")
+
+
+if __name__ == "__main__":
+    main()

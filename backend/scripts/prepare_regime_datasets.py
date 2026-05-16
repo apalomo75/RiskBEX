@@ -169,7 +169,7 @@ def print_dataset_summary(name, df, split_column):
     print(f"{split_column}: {df[split_column].value_counts().to_dict()}")
 
 
-if __name__ == "__main__":
+def main():
     regime_df = pd.read_csv(REGIME_DATASET_PATH)
     regime_summary_df = pd.read_csv(REGIME_SUMMARY_PATH)
 
@@ -208,3 +208,7 @@ if __name__ == "__main__":
     print(main_mapping_df.to_string(index=False))
     print(f"created regime_exposure_mapping_robust.csv shape {robust_mapping_df.shape}")
     print(robust_mapping_df.to_string(index=False))
+
+
+if __name__ == "__main__":
+    main()
