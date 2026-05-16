@@ -650,6 +650,25 @@ def fetch_backtesting_endpoint_safe(path: str, fallback, label: str):
         return fallback
 
 
+@st.cache_data(ttl=30)
+def fetch_tail_endpoint(path: str):
+    response = requests.get(f"{API_URL}{path}", timeout=10)
+    response.raise_for_status()
+    return response.json()
+
+
+def fetch_tail_endpoint_safe(path: str, fallback, label: str):
+    try:
+        return fetch_tail_endpoint(path)
+    except Exception as e:
+        st.warning(
+            f"No se pudo cargar {label}. Los outputs de Tail Risk todavía no están generados. "
+            "Ejecuta scripts/run_tail_analysis.py."
+        )
+        st.caption(str(e))
+        return fallback
+
+
 def regime_card_class(economic_label: str):
     label = (economic_label or "").lower()
     if "low" in label:
@@ -1146,6 +1165,269 @@ def render_backtest_latest(latest_payload):
     )
 
 
+def prepare_tail_events(records):
+    tail_df = pd.DataFrame(records)
+    if tail_df.empty:
+        return tail_df
+    tail_df["date"] = pd.to_datetime(tail_df["date"])
+    tail_df["stress_tail_event"] = tail_df["stress_tail_event"].astype(bool)
+    return tail_df.sort_values("date").reset_index(drop=True)
+
+
+def prepare_tail_metrics(records, sample: str):
+    metrics_df = pd.DataFrame(records)
+    if metrics_df.empty:
+        return metrics_df
+    return metrics_df[metrics_df["sample"] == sample].reset_index(drop=True)
+
+
+def prepare_tail_threshold(records, sample: str):
+    thresholds_df = pd.DataFrame(records)
+    if thresholds_df.empty:
+        return {}
+    sample_rows = thresholds_df[thresholds_df["sample"] == sample]
+    if sample_rows.empty:
+        return {}
+    return sample_rows.iloc[0].to_dict()
+
+
+def tail_metric_value(metrics_df, strategy, column):
+    row = metrics_df[metrics_df["strategy"] == strategy]
+    if row.empty:
+        return None
+    return float(row.iloc[0][column])
+
+
+def tail_severity_note(buy_hold_value, strategy_value, label, lower_is_better=False):
+    if buy_hold_value is None or strategy_value is None:
+        return "Comparación no disponible."
+    delta = strategy_value - buy_hold_value
+    if lower_is_better:
+        if delta < 0:
+            return f"Menor que Buy & Hold por {abs(delta):.2%}."
+        if delta > 0:
+            return f"Mayor que Buy & Hold por {abs(delta):.2%}."
+        return "Sin diferencia frente a Buy & Hold."
+    if delta > 0:
+        return f"Menos severo que Buy & Hold por {abs(delta):.2%}."
+    if delta < 0:
+        return f"Más severo que Buy & Hold por {abs(delta):.2%}."
+    return "Sin diferencia frente a Buy & Hold."
+
+
+def render_tail_metric_cards(threshold_payload, metrics_df):
+    if not threshold_payload or metrics_df.empty:
+        st.info("No hay métricas de cola disponibles.")
+        return
+    cvar_buy_hold = tail_metric_value(metrics_df, "Buy & Hold", "tail_CVaR_95")
+    cvar_strategy = tail_metric_value(metrics_df, "Regime Strategy", "tail_CVaR_95")
+
+    cards = [
+        (
+            "Tail threshold",
+            format_pct(threshold_payload.get("tail_threshold", 0.0)),
+            "Umbral del peor 5% OOS.",
+        ),
+        (
+            "Eventos extremos",
+            str(int(threshold_payload.get("n_tail_events", 0))),
+            "Sesiones clasificadas como cola izquierda.",
+        ),
+        (
+            "Tail share",
+            format_pct(threshold_payload.get("tail_share", 0.0)),
+            "Proporción OOS bajo el threshold.",
+        ),
+        (
+            "Worst market return",
+            format_pct(threshold_payload.get("worst_market_return", 0.0)),
+            "Peor retorno diario de mercado.",
+        ),
+        (
+            "CVaR cola Buy & Hold",
+            format_pct(cvar_buy_hold) if cvar_buy_hold is not None else "N/D",
+            "Severidad media en la cola.",
+        ),
+        (
+            "CVaR cola Regime Strategy",
+            format_pct(cvar_strategy) if cvar_strategy is not None else "N/D",
+            tail_severity_note(cvar_buy_hold, cvar_strategy, "CVaR cola"),
+        ),
+    ]
+    cols = st.columns(3)
+    for index, (label, value, note) in enumerate(cards):
+        with cols[index % 3]:
+            metric_card(label, value, note)
+
+
+def render_tail_defensive_reading(metrics_df):
+    if metrics_df.empty:
+        return
+    comparisons = [
+        ("mean_tail_return", "retorno medio de cola", False),
+        ("tail_volatility", "volatilidad de cola", True),
+        ("tail_CVaR_95", "CVaR de cola", False),
+        ("tail_total_return", "acumulado en días tail", False),
+        ("max_backtest_drawdown_on_tail_days", "drawdown observado en días tail", False),
+    ]
+    fragments = []
+    for column, label, lower_is_better in comparisons:
+        buy_hold_value = tail_metric_value(metrics_df, "Buy & Hold", column)
+        strategy_value = tail_metric_value(metrics_df, "Regime Strategy", column)
+        fragments.append(
+            f"{label}: {tail_severity_note(buy_hold_value, strategy_value, label, lower_is_better).lower()}"
+        )
+
+    st.markdown(
+        f"""
+        <div class="panel-box">
+            <div class="regime-card-title">Comparación defensiva en cola</div>
+            <div class="regime-card-detail">
+                La comparación se realiza sobre los mismos días extremos del mercado.
+                Por tanto, la diferencia entre estrategias refleja cómo la reducción de exposición
+                modifica la severidad de pérdidas durante episodios de cola izquierda.<br><br>
+                {'<br>'.join(fragments)}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_tail_event_timeline(tail_df, threshold):
+    if tail_df.empty:
+        st.info("No hay eventos de cola disponibles.")
+        return
+    fig, ax = plt.subplots(figsize=(10, 3.4))
+    ax.plot(
+        tail_df["date"],
+        tail_df["ret_1d"],
+        linewidth=1.0,
+        color="#8d8479",
+        alpha=0.65,
+        label="ret_1d",
+    )
+    tail_days = tail_df[tail_df["stress_tail_event"]]
+    ax.scatter(
+        tail_days["date"],
+        tail_days["ret_1d"],
+        color="#be5a54",
+        s=28,
+        alpha=0.95,
+        label="Evento extremo",
+        zorder=3,
+    )
+    ax.axhline(float(threshold), color="#d6c2a8", linestyle="--", linewidth=1.2, label="Tail threshold")
+    ax.set_ylabel("Log return")
+    ax.legend(facecolor="#171717", edgecolor="#4a4035", labelcolor="#ddd4c9")
+    style_regime_axis(ax)
+    fig.autofmt_xdate()
+    fig.tight_layout()
+    st.pyplot(fig, use_container_width=True)
+    plt.close(fig)
+
+
+def render_tail_cumulative_chart(tail_df):
+    if tail_df.empty:
+        st.info("No hay datos para visualizar acumulados de cola.")
+        return
+    tail_only_df = tail_df[tail_df["stress_tail_event"]].copy()
+    if tail_only_df.empty:
+        st.info("No hay días tail para visualizar acumulados.")
+        return
+    fig, ax = plt.subplots(figsize=(10, 3.4))
+    ax.plot(
+        tail_only_df["date"],
+        tail_only_df["benchmark_tail_cum"],
+        linewidth=2.0,
+        color="#d6c2a8",
+        label="Buy & Hold",
+    )
+    ax.plot(
+        tail_only_df["date"],
+        tail_only_df["strategy_tail_cum"],
+        linewidth=2.0,
+        color="#7f8f7a",
+        label="Regime Strategy",
+    )
+    ax.set_ylabel("Tail cumulative")
+    ax.legend(facecolor="#171717", edgecolor="#4a4035", labelcolor="#ddd4c9")
+    style_regime_axis(ax)
+    fig.autofmt_xdate()
+    fig.tight_layout()
+    st.pyplot(fig, use_container_width=True)
+    plt.close(fig)
+
+
+def render_tail_cvar_bars(metrics_df):
+    if metrics_df.empty:
+        st.info("No hay CVaR de cola disponible.")
+        return
+    labels = ["Buy & Hold", "Regime Strategy"]
+    values = [
+        tail_metric_value(metrics_df, "Buy & Hold", "tail_CVaR_95"),
+        tail_metric_value(metrics_df, "Regime Strategy", "tail_CVaR_95"),
+    ]
+    fig, ax = plt.subplots(figsize=(6.5, 3.2))
+    ax.bar(labels, values, color=["#d6c2a8", "#7f8f7a"])
+    ax.set_ylabel("Tail CVaR 95")
+    style_regime_axis(ax)
+    fig.tight_layout()
+    st.pyplot(fig, use_container_width=True)
+    plt.close(fig)
+
+
+def render_tail_regime_composition(tail_df):
+    if tail_df.empty:
+        st.info("No hay composición de regímenes disponible.")
+        return
+    tail_only_df = tail_df[tail_df["stress_tail_event"]]
+    if tail_only_df.empty:
+        st.info("No hay días tail para contar regímenes.")
+        return
+    counts = tail_only_df["regime_label"].value_counts()
+    fig, ax = plt.subplots(figsize=(6.5, 3.2))
+    ax.bar(counts.index.tolist(), counts.values.tolist(), color="#d6c2a8")
+    ax.set_ylabel("Número de sesiones")
+    style_regime_axis(ax)
+    fig.tight_layout()
+    st.pyplot(fig, use_container_width=True)
+    plt.close(fig)
+
+
+def render_tail_latest(latest_payload):
+    if not latest_payload:
+        st.info("No hay estado latest de Tail Risk disponible.")
+        return
+    is_tail = bool(latest_payload.get("stress_tail_event", False))
+    tail_message = (
+        "La última sesión sí pertenece al conjunto de eventos extremos."
+        if is_tail
+        else "La última sesión no pertenece al peor 5% OOS."
+    )
+    st.markdown(
+        f"""
+        <div class="panel-box">
+            <div class="regime-card-title">Última sesión evaluada</div>
+            <div class="regime-card-label">{latest_payload.get("regime_label", "N/D")}</div>
+            <div class="regime-card-detail">
+                Fecha: <b>{latest_payload.get("date", "N/D")}</b><br>
+                Retorno mercado: <b>{float(latest_payload.get("ret_1d", 0.0)):.2%}</b><br>
+                Tail threshold: <b>{float(latest_payload.get("tail_threshold", 0.0)):.2%}</b><br>
+                Exposición aplicada: <b>{float(latest_payload.get("strategy_exposure", 0.0)):.2f}</b><br>
+                Buy & Hold return: <b>{float(latest_payload.get("benchmark_return", 0.0)):.2%}</b><br>
+                Regime Strategy return: <b>{float(latest_payload.get("strategy_return", 0.0)):.2%}</b><br>
+                <b>{tail_message}</b>
+            </div>
+            <div class="uncertainty-note">
+                {latest_payload.get("methodology", "")}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 enter = st.query_params.get("enter", "0")
 
 if enter != "1":
@@ -1209,13 +1491,14 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
     [
         "Visión general",
         "Análisis histórico",
         "Figuras de investigación",
         "Regímenes",
         "Backtesting adaptativo",
+        "Riesgo de cola",
     ]
 )
 
@@ -1651,6 +1934,161 @@ with tab5:
             st.info("No hay datos crudos disponibles para mostrar.")
         else:
             st.dataframe(backtest_results.tail(250), use_container_width=True, hide_index=True)
+
+with tab6:
+    st.subheader("Riesgo de cola")
+    st.markdown(
+        """
+        <div class="panel-box">
+            <div class="regime-card-detail">
+                El análisis de riesgo de cola evalúa el comportamiento de Buy & Hold y de la
+                estrategia adaptativa durante el peor 5% de sesiones OOS del mercado.
+                Los eventos extremos se definen sobre <b>ret_1d</b>, no sobre los retornos
+                de cada estrategia, para comparar ambas reglas en los mismos días de estrés.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if hasattr(st, "segmented_control"):
+        tail_sample_label = st.segmented_control(
+            "Selector de muestra",
+            ["MAIN", "ROBUST"],
+            default="MAIN",
+            key="tail_sample_selector",
+        )
+    else:
+        tail_sample_label = st.radio(
+            "Selector de muestra",
+            ["MAIN", "ROBUST"],
+            horizontal=True,
+            key="tail_sample_selector",
+        )
+    tail_sample_label = tail_sample_label or "MAIN"
+    tail_sample = tail_sample_label.lower()
+    render_split_badge(tail_sample_label)
+
+    tail_events = prepare_tail_events(
+        fetch_tail_endpoint_safe(
+            f"/tail-risk/events?sample={tail_sample}",
+            [],
+            f"los eventos de cola {tail_sample_label}",
+        )
+    )
+    tail_metrics = prepare_tail_metrics(
+        fetch_tail_endpoint_safe(
+            "/tail-risk/metrics",
+            [],
+            "las métricas de Tail Risk",
+        ),
+        tail_sample_label,
+    )
+    tail_threshold = prepare_tail_threshold(
+        fetch_tail_endpoint_safe(
+            "/tail-risk/thresholds",
+            [],
+            "los thresholds de Tail Risk",
+        ),
+        tail_sample_label,
+    )
+    tail_latest = fetch_tail_endpoint_safe(
+        f"/tail-risk/latest?sample={tail_sample}",
+        {},
+        f"el último estado de Tail Risk {tail_sample_label}",
+    )
+
+    st.markdown('<div class="section-title">Monitor de cola izquierda</div>', unsafe_allow_html=True)
+    render_tail_metric_cards(tail_threshold, tail_metrics)
+    render_tail_defensive_reading(tail_metrics)
+
+    st.markdown('<div class="section-title">Latest</div>', unsafe_allow_html=True)
+    render_tail_latest(tail_latest)
+
+    timeline_col, tail_cum_col = st.columns(2)
+    with timeline_col:
+        st.markdown('<div class="section-title">Timeline de eventos extremos</div>', unsafe_allow_html=True)
+        render_tail_event_timeline(
+            tail_events,
+            tail_threshold.get("tail_threshold", 0.0) if tail_threshold else 0.0,
+        )
+    with tail_cum_col:
+        st.markdown('<div class="section-title">Acumulado en días tail</div>', unsafe_allow_html=True)
+        render_tail_cumulative_chart(tail_events)
+
+    cvar_col, regime_col = st.columns(2)
+    with cvar_col:
+        st.markdown('<div class="section-title">CVaR de cola</div>', unsafe_allow_html=True)
+        render_tail_cvar_bars(tail_metrics)
+    with regime_col:
+        st.markdown(
+            '<div class="section-title">Composición de regímenes en estrés</div>',
+            unsafe_allow_html=True,
+        )
+        render_tail_regime_composition(tail_events)
+
+    st.markdown('<div class="section-title">Métricas tail</div>', unsafe_allow_html=True)
+    if tail_metrics.empty:
+        st.info("No hay tabla de métricas tail disponible para la muestra seleccionada.")
+    else:
+        display_tail_metrics = tail_metrics[
+            [
+                "strategy",
+                "n_tail_events",
+                "mean_tail_return",
+                "tail_volatility",
+                "tail_total_return",
+                "tail_VaR_95",
+                "tail_CVaR_95",
+                "max_backtest_drawdown_on_tail_days",
+                "hit_ratio_negative",
+            ]
+        ].copy()
+        for column in [
+            "mean_tail_return",
+            "tail_volatility",
+            "tail_total_return",
+            "tail_VaR_95",
+            "tail_CVaR_95",
+            "max_backtest_drawdown_on_tail_days",
+            "hit_ratio_negative",
+        ]:
+            display_tail_metrics[column] = display_tail_metrics[column].map(
+                lambda value: f"{float(value):.2%}"
+            )
+        st.dataframe(display_tail_metrics, use_container_width=True, hide_index=True)
+
+    st.markdown('<div class="section-title">Peores sesiones</div>', unsafe_allow_html=True)
+    if tail_events.empty:
+        st.info("No hay sesiones disponibles para mostrar.")
+    else:
+        worst_days = tail_events.sort_values("ret_1d", ascending=True).head(10)
+        worst_days = worst_days[
+            [
+                "date",
+                "ret_1d",
+                "regime_label",
+                "strategy_exposure",
+                "benchmark_return",
+                "strategy_return",
+                "benchmark_drawdown",
+                "strategy_drawdown",
+                "stress_tail_event",
+            ]
+        ].copy()
+        for column in [
+            "ret_1d",
+            "benchmark_return",
+            "strategy_return",
+            "benchmark_drawdown",
+            "strategy_drawdown",
+        ]:
+            worst_days[column] = worst_days[column].map(lambda value: f"{float(value):.2%}")
+        worst_days["strategy_exposure"] = worst_days["strategy_exposure"].map(
+            lambda value: f"{float(value):.2f}"
+        )
+        worst_days["date"] = worst_days["date"].dt.strftime("%Y-%m-%d")
+        st.dataframe(worst_days, use_container_width=True, hide_index=True)
 
 st.markdown(
     """
