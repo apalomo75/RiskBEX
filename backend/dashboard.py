@@ -631,6 +631,25 @@ def fetch_regime_endpoint_safe(path: str, fallback, label: str):
         return fallback
 
 
+@st.cache_data(ttl=30)
+def fetch_backtesting_endpoint(path: str):
+    response = requests.get(f"{API_URL}{path}", timeout=10)
+    response.raise_for_status()
+    return response.json()
+
+
+def fetch_backtesting_endpoint_safe(path: str, fallback, label: str):
+    try:
+        return fetch_backtesting_endpoint(path)
+    except Exception as e:
+        st.warning(
+            f"No se pudo cargar {label}. Los outputs de backtesting todavía no están generados. "
+            "Ejecuta scripts/run_adaptive_backtest.py."
+        )
+        st.caption(str(e))
+        return fallback
+
+
 def regime_card_class(economic_label: str):
     label = (economic_label or "").lower()
     if "low" in label:
@@ -931,6 +950,202 @@ def panel_header(title: str, info_title: str, info_text: str):
         info_popover(info_title, info_text)
 
 
+def prepare_backtest_results(records):
+    backtest_df = pd.DataFrame(records)
+    if backtest_df.empty:
+        return backtest_df
+    backtest_df["date"] = pd.to_datetime(backtest_df["date"])
+    return backtest_df.sort_values("date").reset_index(drop=True)
+
+
+def prepare_backtest_metrics(records, sample: str):
+    metrics_df = pd.DataFrame(records)
+    if metrics_df.empty:
+        return metrics_df
+    return metrics_df[metrics_df["sample"] == sample].reset_index(drop=True)
+
+
+def format_pct(value):
+    return f"{float(value):.2%}"
+
+
+def strategy_metric_value(metrics_df, strategy, column):
+    row = metrics_df[metrics_df["strategy"] == strategy]
+    if row.empty:
+        return None
+    return float(row.iloc[0][column])
+
+
+def metric_delta_note(buy_hold_value, strategy_value, metric_name, negative_is_better=False):
+    if buy_hold_value is None or strategy_value is None:
+        return "Comparación no disponible."
+    delta = strategy_value - buy_hold_value
+    if metric_name in {"VaR 95", "CVaR 95", "Max drawdown"}:
+        if delta > 0:
+            return f"Menos severo que Buy & Hold por {abs(delta):.2%}."
+        if delta < 0:
+            return f"Más severo que Buy & Hold por {abs(delta):.2%}."
+        return "Sin diferencia frente a Buy & Hold."
+    if negative_is_better:
+        if delta < 0:
+            return f"Reducción frente a Buy & Hold de {abs(delta):.2%}."
+        if delta > 0:
+            return f"Aumento frente a Buy & Hold de {abs(delta):.2%}."
+        return "Sin diferencia frente a Buy & Hold."
+    if delta > 0:
+        return f"Superior a Buy & Hold por {abs(delta):.2%}."
+    if delta < 0:
+        return f"Inferior a Buy & Hold por {abs(delta):.2%}."
+    return "Sin diferencia frente a Buy & Hold."
+
+
+def render_backtest_metric_cards(metrics_df):
+    if metrics_df.empty:
+        st.info("No hay métricas de backtesting disponibles.")
+        return
+
+    metrics = [
+        ("Total return", "total_return", False),
+        ("Annualized volatility", "annualized_volatility", True),
+        ("VaR 95", "VaR_95", False),
+        ("CVaR 95", "CVaR_95", False),
+        ("Max drawdown", "max_drawdown", False),
+    ]
+    cols = st.columns(len(metrics))
+    for col, (label, column, negative_is_better) in zip(cols, metrics):
+        buy_hold_value = strategy_metric_value(metrics_df, "Buy & Hold", column)
+        strategy_value = strategy_metric_value(metrics_df, "Regime Strategy", column)
+        with col:
+            metric_card(
+                label,
+                format_pct(strategy_value) if strategy_value is not None else "N/D",
+                metric_delta_note(
+                    buy_hold_value,
+                    strategy_value,
+                    label,
+                    negative_is_better=negative_is_better,
+                ),
+            )
+
+
+def render_defensive_reading(metrics_df):
+    if metrics_df.empty:
+        return
+    buy_hold = metrics_df[metrics_df["strategy"] == "Buy & Hold"]
+    strategy = metrics_df[metrics_df["strategy"] == "Regime Strategy"]
+    if buy_hold.empty or strategy.empty:
+        return
+
+    buy_hold = buy_hold.iloc[0]
+    strategy = strategy.iloc[0]
+    vol_delta = float(strategy["annualized_volatility"] - buy_hold["annualized_volatility"])
+    cvar_delta = float(strategy["CVaR_95"] - buy_hold["CVaR_95"])
+    drawdown_delta = float(strategy["max_drawdown"] - buy_hold["max_drawdown"])
+    return_delta = float(strategy["total_return"] - buy_hold["total_return"])
+
+    vol_text = (
+        f"reduce volatilidad anualizada en {abs(vol_delta):.2%}"
+        if vol_delta < 0
+        else f"aumenta volatilidad anualizada en {abs(vol_delta):.2%}"
+    )
+    cvar_text = (
+        f"hace el CVaR menos severo en {abs(cvar_delta):.2%}"
+        if cvar_delta > 0
+        else f"hace el CVaR más severo en {abs(cvar_delta):.2%}"
+    )
+    drawdown_text = (
+        f"hace el drawdown máximo menos severo en {abs(drawdown_delta):.2%}"
+        if drawdown_delta > 0
+        else f"hace el drawdown máximo más severo en {abs(drawdown_delta):.2%}"
+    )
+    return_text = (
+        f"con un retorno acumulado superior en {abs(return_delta):.2%}"
+        if return_delta > 0
+        else f"con un sacrificio de retorno acumulado de {abs(return_delta):.2%}"
+    )
+
+    st.markdown(
+        f"""
+        <div class="panel-box">
+            <div class="regime-card-title">Lectura defensiva</div>
+            <div class="regime-card-detail">
+                La estrategia adaptativa {vol_text}, {cvar_text} y {drawdown_text},
+                {return_text}. No se interpreta como una señal de mercado, sino como
+                una regla defensiva de reducción de exposición ante regímenes de mayor vulnerabilidad.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_backtest_line_chart(backtest_df, columns, labels, title, ylabel):
+    if backtest_df.empty:
+        st.info(f"No hay datos para visualizar {title.lower()}.")
+        return
+    fig, ax = plt.subplots(figsize=(10, 3.4))
+    colors = ["#d6c2a8", "#7f8f7a", "#be5a54"]
+    for column, label, color in zip(columns, labels, colors):
+        ax.plot(backtest_df["date"], backtest_df[column], linewidth=2.0, label=label, color=color)
+    ax.set_ylabel(ylabel)
+    ax.legend(facecolor="#171717", edgecolor="#4a4035", labelcolor="#ddd4c9")
+    style_regime_axis(ax)
+    fig.autofmt_xdate()
+    fig.tight_layout()
+    st.pyplot(fig, use_container_width=True)
+    plt.close(fig)
+
+
+def render_backtest_exposure(backtest_df):
+    if backtest_df.empty:
+        st.info("No hay datos para visualizar la exposición adaptativa.")
+        return
+    fig, ax = plt.subplots(figsize=(10, 2.8))
+    ax.step(
+        backtest_df["date"],
+        backtest_df["strategy_exposure"],
+        where="post",
+        linewidth=2.0,
+        color="#d6c2a8",
+        label="Regime Strategy exposure",
+    )
+    ax.set_yticks([0.25, 0.75, 1.0])
+    ax.set_ylim(0.15, 1.05)
+    ax.set_ylabel("Exposición")
+    ax.legend(facecolor="#171717", edgecolor="#4a4035", labelcolor="#ddd4c9")
+    style_regime_axis(ax)
+    fig.autofmt_xdate()
+    fig.tight_layout()
+    st.pyplot(fig, use_container_width=True)
+    plt.close(fig)
+
+
+def render_backtest_latest(latest_payload):
+    if not latest_payload:
+        st.info("No hay estado latest de backtesting disponible.")
+        return
+    st.markdown(
+        f"""
+        <div class="panel-box">
+            <div class="regime-card-title">Estado actual del backtest</div>
+            <div class="regime-card-label">{latest_payload.get("regime_label", "N/D")}</div>
+            <div class="regime-card-detail">
+                Fecha: <b>{latest_payload.get("date", "N/D")}</b><br>
+                Exposición aplicada: <b>{float(latest_payload.get("strategy_exposure", 0.0)):.2f}</b><br>
+                Exposición objetivo: <b>{float(latest_payload.get("target_exposure", 0.0)):.2f}</b><br>
+                Buy & Hold acumulado: <b>{float(latest_payload.get("benchmark_cum", 0.0)):.2f}x</b><br>
+                Estrategia acumulada: <b>{float(latest_payload.get("strategy_cum", 0.0)):.2f}x</b><br>
+                Drawdown estrategia: <b>{float(latest_payload.get("strategy_drawdown", 0.0)):.2%}</b>
+            </div>
+            <div class="uncertainty-note">
+                {latest_payload.get("methodology", "")}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 enter = st.query_params.get("enter", "0")
 
 if enter != "1":
@@ -994,8 +1209,14 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-tab1, tab2, tab3, tab4 = st.tabs(
-    ["Visión general", "Análisis histórico", "Figuras de investigación", "Regímenes"]
+tab1, tab2, tab3, tab4, tab5 = st.tabs(
+    [
+        "Visión general",
+        "Análisis histórico",
+        "Figuras de investigación",
+        "Regímenes",
+        "Backtesting adaptativo",
+    ]
 )
 
 with tab1:
@@ -1317,6 +1538,119 @@ with tab4:
             lambda value: f"{float(value):.2%}"
         )
         st.dataframe(comparison_df, use_container_width=True, hide_index=True)
+
+with tab5:
+    st.subheader("Backtesting adaptativo")
+    st.markdown(
+        """
+        <div class="panel-box">
+            <div class="regime-card-detail">
+                El backtesting adaptativo compara una exposición Buy & Hold totalmente invertida
+                frente a una estrategia que ajusta exposición según el régimen de riesgo identificado.
+                La exposición se aplica con un desplazamiento de un día, <b>shift(1)</b>, para evitar
+                look-ahead bias.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if hasattr(st, "segmented_control"):
+        backtest_sample_label = st.segmented_control(
+            "Selector de muestra",
+            ["MAIN", "ROBUST"],
+            default="MAIN",
+            key="backtesting_sample_selector",
+        )
+    else:
+        backtest_sample_label = st.radio(
+            "Selector de muestra",
+            ["MAIN", "ROBUST"],
+            horizontal=True,
+            key="backtesting_sample_selector",
+        )
+    backtest_sample_label = backtest_sample_label or "MAIN"
+    backtest_sample = backtest_sample_label.lower()
+    render_split_badge(backtest_sample_label)
+
+    backtest_results = prepare_backtest_results(
+        fetch_backtesting_endpoint_safe(
+            f"/backtesting/results?sample={backtest_sample}",
+            [],
+            f"los resultados de backtesting {backtest_sample_label}",
+        )
+    )
+    backtest_metrics = prepare_backtest_metrics(
+        fetch_backtesting_endpoint_safe(
+            "/backtesting/metrics",
+            [],
+            "las métricas de backtesting",
+        ),
+        backtest_sample_label,
+    )
+    backtest_latest = fetch_backtesting_endpoint_safe(
+        f"/backtesting/latest?sample={backtest_sample}",
+        {},
+        f"el último estado de backtesting {backtest_sample_label}",
+    )
+
+    st.markdown('<div class="section-title">Comparación defensiva OOS</div>', unsafe_allow_html=True)
+    render_backtest_metric_cards(backtest_metrics)
+    render_defensive_reading(backtest_metrics)
+
+    st.markdown('<div class="section-title">Estado actual/latest</div>', unsafe_allow_html=True)
+    render_backtest_latest(backtest_latest)
+
+    chart_col_left, chart_col_right = st.columns(2)
+    with chart_col_left:
+        st.markdown('<div class="section-title">Curvas acumuladas</div>', unsafe_allow_html=True)
+        render_backtest_line_chart(
+            backtest_results,
+            ["benchmark_cum", "strategy_cum"],
+            ["Buy & Hold", "Regime Strategy"],
+            "Curvas acumuladas",
+            "Crecimiento acumulado",
+        )
+    with chart_col_right:
+        st.markdown('<div class="section-title">Drawdown comparado</div>', unsafe_allow_html=True)
+        render_backtest_line_chart(
+            backtest_results,
+            ["benchmark_drawdown", "strategy_drawdown"],
+            ["Buy & Hold", "Regime Strategy"],
+            "Drawdown comparado",
+            "Drawdown",
+        )
+
+    st.markdown('<div class="section-title">Exposición adaptativa aplicada</div>', unsafe_allow_html=True)
+    render_backtest_exposure(backtest_results)
+    st.caption(
+        "La estrategia reduce exposición a 0.75 o 0.25 cuando el régimen filtrado refleja mayor vulnerabilidad."
+    )
+
+    st.markdown('<div class="section-title">Métricas de riesgo</div>', unsafe_allow_html=True)
+    if backtest_metrics.empty:
+        st.info("No hay tabla de métricas disponible para la muestra seleccionada.")
+    else:
+        display_metrics = backtest_metrics.copy()
+        for column in [
+            "total_return",
+            "mean_daily_return",
+            "daily_volatility",
+            "annualized_volatility",
+            "VaR_95",
+            "CVaR_95",
+            "max_drawdown",
+        ]:
+            display_metrics[column] = display_metrics[column].map(
+                lambda value: f"{float(value):.2%}"
+            )
+        st.dataframe(display_metrics, use_container_width=True, hide_index=True)
+
+    with st.expander("Ver datos OOS del backtest"):
+        if backtest_results.empty:
+            st.info("No hay datos crudos disponibles para mostrar.")
+        else:
+            st.dataframe(backtest_results.tail(250), use_container_width=True, hide_index=True)
 
 st.markdown(
     """
