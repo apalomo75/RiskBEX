@@ -42,6 +42,26 @@ def summarize_markov_result(result):
     }
 
 
+def extract_transition_matrix(result):
+    raw_matrix = np.asarray(result.regime_transition, dtype=float).squeeze()
+    if raw_matrix.ndim != 2 or raw_matrix.shape[0] != raw_matrix.shape[1]:
+        raise ValueError(
+            "Expected a square transition matrix from MarkovRegression, "
+            f"got shape {raw_matrix.shape}."
+        )
+
+    # statsmodels stores regime_transition[to_regime, from_regime, t], so columns
+    # sum to one. RISKBEX persists transitions as rows=from_regime, cols=to_regime.
+    transition_matrix = raw_matrix.T
+    row_sums = transition_matrix.sum(axis=1)
+    if not np.allclose(row_sums, 1.0, atol=1e-6):
+        raise ValueError(
+            "Extracted transition matrix rows do not sum to one: "
+            f"{row_sums.tolist()}"
+        )
+    return transition_matrix
+
+
 def compare_markov_models(train_df, k_values, fit_kwargs=None):
     fit_kwargs = fit_kwargs or {}
     endog = train_df["ret_1d"]
