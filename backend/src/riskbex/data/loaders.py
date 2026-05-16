@@ -268,3 +268,95 @@ def load_adaptive_backtest_metrics():
         "adaptive backtest metrics",
     )
     return df
+
+
+def load_tail_analysis(sample: str = "main"):
+    normalized_sample = _normalize_sample(sample)
+    filename = (
+        "tail_analysis_main.csv"
+        if normalized_sample == "main"
+        else "tail_analysis_robust.csv"
+    )
+    df = _load_dataset(PROCESSED_DATA_DIR / filename)
+    _validate_columns(
+        df,
+        [
+            "date",
+            "sample",
+            "ret_1d",
+            "stress_tail_event",
+            "tail_threshold",
+            "regime",
+            "regime_label",
+            "risk_order",
+            "p_regime_0",
+            "p_regime_1",
+            "p_regime_2",
+            "target_exposure",
+            "strategy_exposure",
+            "benchmark_return",
+            "strategy_return",
+            "benchmark_cum",
+            "strategy_cum",
+            "benchmark_drawdown",
+            "strategy_drawdown",
+            "benchmark_tail_cum",
+            "strategy_tail_cum",
+        ],
+        f"{normalized_sample} tail analysis",
+    )
+    _validate_time_series(df, f"{normalized_sample} tail analysis")
+    if df["tail_threshold"].isna().any():
+        raise ValueError(f"{normalized_sample} tail analysis has null tail_threshold.")
+    if df["stress_tail_event"].dtype != bool:
+        df["stress_tail_event"] = df["stress_tail_event"].astype(bool)
+    if not df["stress_tail_event"].any():
+        raise ValueError(
+            f"{normalized_sample} tail analysis has no stress_tail_event rows."
+        )
+    return df
+
+
+def load_tail_metrics():
+    df = _load_dataset(PROCESSED_DATA_DIR / "tail_metrics.csv")
+    _validate_columns(
+        df,
+        [
+            "sample",
+            "strategy",
+            "n_tail_events",
+            "tail_threshold",
+            "tail_share",
+            "mean_tail_return",
+            "median_tail_return",
+            "min_tail_return",
+            "tail_volatility",
+            "tail_total_return",
+            "tail_VaR_95",
+            "tail_CVaR_95",
+            "max_backtest_drawdown_on_tail_days",
+            "hit_ratio_negative",
+        ],
+        "tail metrics",
+    )
+    return df
+
+
+def load_tail_thresholds():
+    df = _load_dataset(PROCESSED_DATA_DIR / "tail_thresholds.csv")
+    _validate_columns(
+        df,
+        [
+            "sample",
+            "threshold_quantile",
+            "tail_threshold",
+            "n_observations",
+            "n_tail_events",
+            "tail_share",
+            "start_date",
+            "end_date",
+            "worst_market_return",
+        ],
+        "tail thresholds",
+    )
+    return df

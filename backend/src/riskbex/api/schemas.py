@@ -169,3 +169,75 @@ class AdaptiveBacktestLatestResponse(BaseModel):
     benchmark_return: float
     strategy_return: float
     methodology: str
+
+
+class TailRiskEventRow(BaseModel):
+    date: str
+    sample: str
+    ret_1d: float
+    stress_tail_event: bool
+    tail_threshold: float
+    regime: int
+    regime_label: str
+    risk_order: int
+    p_regime_0: float
+    p_regime_1: float
+    p_regime_2: float
+    target_exposure: float
+    strategy_exposure: float
+    benchmark_return: float
+    strategy_return: float
+    benchmark_cum: float
+    strategy_cum: float
+    benchmark_drawdown: float
+    strategy_drawdown: float
+    benchmark_tail_cum: float | None
+    strategy_tail_cum: float | None
+
+
+class TailRiskMetricRow(BaseModel):
+    sample: str
+    strategy: str
+    n_tail_events: int
+    tail_threshold: float
+    tail_share: float
+    mean_tail_return: float
+    median_tail_return: float
+    min_tail_return: float
+    tail_volatility: float
+    tail_total_return: float
+    tail_VaR_95: float
+    tail_CVaR_95: float
+    max_backtest_drawdown_on_tail_days: float
+    hit_ratio_negative: float
+
+
+class TailRiskThresholdRow(BaseModel):
+    sample: str
+    threshold_quantile: float
+    tail_threshold: float
+    n_observations: int
+    n_tail_events: int
+    tail_share: float
+    start_date: str
+    end_date: str
+    worst_market_return: float
+
+
+class TailRiskLatestResponse(BaseModel):
+    date: str
+    sample: str
+    regime: int
+    regime_label: str
+    risk_order: int
+    ret_1d: float
+    stress_tail_event: bool
+    tail_threshold: float
+    strategy_exposure: float
+    benchmark_return: float
+    strategy_return: float
+    benchmark_drawdown: float
+    strategy_drawdown: float
+    benchmark_tail_cum: float | None
+    strategy_tail_cum: float | None
+    methodology: str
