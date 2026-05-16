@@ -1,12 +1,29 @@
-venv/
+# Python caches
 __pycache__/
 *.pyc
 
-data/
+# Virtual environments
+venv/
+.venv/
+
+# Secrets and local environment
+.env
+.env.*
+.streamlit/secrets.toml
+
+# OS files
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Generated data outputs
+/data/
 backend/data/
 
+# Generated figures
 figures/
 backend/figures/
 
-logs/
-*.log
+# Source code lives under backend/src/ and must not be ignored.
