@@ -5,6 +5,11 @@ from src.riskbex.paths import (
     CAP4_INPUT_PATH,
     MASTER_DATASET_PATH,
     RAW_PRICES_PATH,
+    REGIME_DATASET_PATH,
+    REGIME_DURATION_SUMMARY_PATH,
+    REGIME_MODEL_SELECTION_PATH,
+    REGIME_SUMMARY_PATH,
+    REGIME_TRANSITION_MATRIX_PATH,
 )
 
 
@@ -14,6 +19,14 @@ def _load_dataset(path):
         df["date"] = pd.to_datetime(df["date"])
         df = df.sort_values("date")
     return df.reset_index(drop=True)
+
+
+def _validate_columns(df, required_columns, dataset_name):
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(
+            f"Missing required {dataset_name} columns: {missing_columns}"
+        )
 
 
 def load_master_dataset():
@@ -40,3 +53,79 @@ def load_regime_input_dataset():
 def load_regime_train_dataset():
     df = load_regime_input_dataset()
     return df[df[REGIME_SPLIT_COLUMN] == REGIME_TRAIN_LABEL].reset_index(drop=True)
+
+
+def load_model_selection():
+    df = _load_dataset(REGIME_MODEL_SELECTION_PATH)
+    _validate_columns(
+        df,
+        ["split", "k_regimes", "aic", "bic", "converged", "selected"],
+        "model selection",
+    )
+    return df
+
+
+def load_regime_dataset():
+    df = _load_dataset(REGIME_DATASET_PATH)
+    _validate_columns(
+        df,
+        [
+            "date",
+            "main_regime",
+            "robust_regime",
+            "main_p_regime_0",
+            "main_p_regime_1",
+            "main_p_regime_2",
+            "robust_p_regime_0",
+            "robust_p_regime_1",
+            "robust_p_regime_2",
+        ],
+        "regime dataset",
+    )
+    return df
+
+
+def load_regime_summary():
+    df = _load_dataset(REGIME_SUMMARY_PATH)
+    _validate_columns(
+        df,
+        ["split", "regime", "economic_label", "risk_order"],
+        "regime summary",
+    )
+    return df
+
+
+def load_transition_matrix():
+    df = _load_dataset(REGIME_TRANSITION_MATRIX_PATH)
+    _validate_columns(
+        df,
+        [
+            "split",
+            "from_regime",
+            "to_regime",
+            "transition_probability",
+            "from_label",
+            "to_label",
+        ],
+        "transition matrix",
+    )
+    return df
+
+
+def load_duration_summary():
+    df = _load_dataset(REGIME_DURATION_SUMMARY_PATH)
+    _validate_columns(
+        df,
+        [
+            "split",
+            "scope",
+            "regime",
+            "economic_label",
+            "risk_order",
+            "mean_duration_trading_days",
+            "median_duration_trading_days",
+            "max_duration_trading_days",
+        ],
+        "duration summary",
+    )
+    return df
