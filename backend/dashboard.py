@@ -340,6 +340,17 @@ st.markdown(
         line-height: 1.55;
     }
 
+    .split-badge {
+        display: inline-block;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 0.38rem 0.75rem;
+        background: rgba(214, 194, 168, 0.10);
+        color: var(--sand-light);
+        font-size: 0.86rem;
+        margin-bottom: 0.75rem;
+    }
+
     .soft-caption {
         color: var(--muted);
         font-size: 0.92rem;
@@ -604,6 +615,15 @@ def fetch_regime_endpoint(path: str):
     return response.json()
 
 
+def fetch_regime_endpoint_safe(path: str, fallback, label: str):
+    try:
+        return fetch_regime_endpoint(path)
+    except Exception as e:
+        st.warning(f"No se pudo cargar {label}.")
+        st.caption(str(e))
+        return fallback
+
+
 def regime_card_class(economic_label: str):
     label = (economic_label or "").lower()
     if "low" in label:
@@ -613,7 +633,23 @@ def regime_card_class(economic_label: str):
     return "medium"
 
 
+def split_description(split: str):
+    if split == "ROBUST":
+        return "validación robusta temporal"
+    return "partición principal"
+
+
+def render_split_badge(split: str):
+    st.markdown(
+        f'<span class="split-badge">{split} · {split_description(split)}</span>',
+        unsafe_allow_html=True,
+    )
+
+
 def render_regime_card(title: str, payload: dict):
+    if not payload:
+        st.info("No hay estado actual disponible.")
+        return
     probability = float(payload.get("dominant_probability", 0.0))
     card_class = regime_card_class(payload.get("economic_label", ""))
     st.markdown(
@@ -1050,84 +1086,114 @@ with tab3:
 with tab4:
     st.subheader("Regímenes Markov")
 
-    try:
-        latest_main = fetch_regime_endpoint("/regimes/latest?split=MAIN")
-        latest_robust = fetch_regime_endpoint("/regimes/latest?split=ROBUST")
-        history_120 = prepare_regime_history(
-            fetch_regime_endpoint("/regimes/history?split=MAIN&limit=120")
+    if hasattr(st, "segmented_control"):
+        split_selected = st.segmented_control(
+            "Selector de partición",
+            ["MAIN", "ROBUST"],
+            default="MAIN",
+            key="regime_split_selector",
         )
-        history_250 = prepare_regime_history(
-            fetch_regime_endpoint("/regimes/history?split=MAIN&limit=250")
-        )
-        transitions_main = fetch_regime_endpoint("/regimes/transitions?split=MAIN")
-        durations_main = fetch_regime_endpoint(
-            "/regimes/durations?split=MAIN&scope=FULL_FILTERED"
-        )
-        summary_records = fetch_regime_endpoint("/regimes/summary")
-    except Exception as e:
-        st.warning("No se pudieron cargar los endpoints de regímenes.")
-        st.caption(str(e))
     else:
-        st.markdown('<div class="section-title">Estado actual del régimen</div>', unsafe_allow_html=True)
-        current_cols = st.columns(2)
-        with current_cols[0]:
-            render_regime_card("MAIN", latest_main)
-        with current_cols[1]:
-            render_regime_card("ROBUST", latest_robust)
+        split_selected = st.radio(
+            "Selector de partición",
+            ["MAIN", "ROBUST"],
+            horizontal=True,
+            key="regime_split_selector",
+        )
+    split_selected = split_selected or "MAIN"
+    render_split_badge(split_selected)
 
-        st.markdown('<div class="section-title">Probabilidades filtradas</div>', unsafe_allow_html=True)
-        st.caption("Probabilidades filtradas del modelo Markov Switching")
-        if history_120.empty:
-            st.info("No hay histórico de probabilidades disponible.")
-        else:
-            probability_df = history_120.set_index("date")[
-                ["p_regime_0", "p_regime_1", "p_regime_2"]
+    latest_selected = fetch_regime_endpoint_safe(
+        f"/regimes/latest?split={split_selected}",
+        {},
+        "el estado actual del régimen",
+    )
+    history_120 = prepare_regime_history(
+        fetch_regime_endpoint_safe(
+            f"/regimes/history?split={split_selected}&limit=120",
+            [],
+            "las probabilidades filtradas",
+        )
+    )
+    history_250 = prepare_regime_history(
+        fetch_regime_endpoint_safe(
+            f"/regimes/history?split={split_selected}&limit=250",
+            [],
+            "el histórico de regímenes",
+        )
+    )
+    transitions_selected = fetch_regime_endpoint_safe(
+        f"/regimes/transitions?split={split_selected}",
+        [],
+        "la matriz de transición",
+    )
+    durations_selected = fetch_regime_endpoint_safe(
+        f"/regimes/durations?split={split_selected}&scope=FULL_FILTERED",
+        [],
+        "las duraciones de régimen",
+    )
+    summary_records = fetch_regime_endpoint_safe(
+        "/regimes/summary",
+        [],
+        "el resumen comparativo MAIN vs ROBUST",
+    )
+
+    st.markdown('<div class="section-title">Estado actual del régimen</div>', unsafe_allow_html=True)
+    render_regime_card(split_selected, latest_selected)
+
+    st.markdown('<div class="section-title">Probabilidades filtradas</div>', unsafe_allow_html=True)
+    st.caption("Probabilidades filtradas del modelo Markov Switching")
+    if history_120.empty:
+        st.info("No hay histórico de probabilidades disponible.")
+    else:
+        probability_df = history_120.set_index("date")[
+            ["p_regime_0", "p_regime_1", "p_regime_2"]
+        ]
+        st.area_chart(probability_df, use_container_width=True)
+
+    st.markdown('<div class="section-title">Histórico reciente de regímenes</div>', unsafe_allow_html=True)
+    if history_250.empty:
+        st.info("No hay histórico de regímenes disponible.")
+    else:
+        render_regime_timeline(history_250)
+
+    heatmap_col, duration_col = st.columns(2)
+    with heatmap_col:
+        st.markdown('<div class="section-title">Heatmap de transición</div>', unsafe_allow_html=True)
+        render_transition_heatmap(transitions_selected)
+        st.caption(
+            "Las probabilidades diagonales elevadas reflejan persistencia de régimen."
+        )
+
+    with duration_col:
+        st.markdown('<div class="section-title">Persistencia / duraciones</div>', unsafe_allow_html=True)
+        render_duration_bars(durations_selected)
+        st.caption("Duración media de bloques consecutivos de régimen.")
+
+    st.markdown('<div class="section-title">Comparación MAIN vs ROBUST</div>', unsafe_allow_html=True)
+    summary_df = pd.DataFrame(summary_records)
+    if summary_df.empty:
+        st.info("No hay resumen de regímenes disponible.")
+    else:
+        comparison_df = summary_df[
+            [
+                "split",
+                "economic_label",
+                "frequency_pct",
+                "mean_ewma_vol",
+                "mean_cvar_95_60d",
             ]
-            st.area_chart(probability_df, use_container_width=True)
-
-        st.markdown('<div class="section-title">Histórico reciente de regímenes</div>', unsafe_allow_html=True)
-        if history_250.empty:
-            st.info("No hay histórico de regímenes disponible.")
-        else:
-            render_regime_timeline(history_250)
-
-        heatmap_col, duration_col = st.columns(2)
-        with heatmap_col:
-            st.markdown('<div class="section-title">Heatmap de transición</div>', unsafe_allow_html=True)
-            render_transition_heatmap(transitions_main)
-            st.caption(
-                "Las probabilidades diagonales elevadas reflejan persistencia de régimen."
-            )
-
-        with duration_col:
-            st.markdown('<div class="section-title">Persistencia / duraciones</div>', unsafe_allow_html=True)
-            render_duration_bars(durations_main)
-            st.caption("Duración media de bloques consecutivos de régimen.")
-
-        st.markdown('<div class="section-title">Comparación MAIN vs ROBUST</div>', unsafe_allow_html=True)
-        summary_df = pd.DataFrame(summary_records)
-        if summary_df.empty:
-            st.info("No hay resumen de regímenes disponible.")
-        else:
-            comparison_df = summary_df[
-                [
-                    "split",
-                    "economic_label",
-                    "frequency_pct",
-                    "mean_ewma_vol",
-                    "mean_cvar_95_60d",
-                ]
-            ].copy()
-            comparison_df["frequency_pct"] = comparison_df["frequency_pct"].map(
-                lambda value: f"{float(value):.1%}"
-            )
-            comparison_df["mean_ewma_vol"] = comparison_df["mean_ewma_vol"].map(
-                lambda value: f"{float(value):.2%}"
-            )
-            comparison_df["mean_cvar_95_60d"] = comparison_df["mean_cvar_95_60d"].map(
-                lambda value: f"{float(value):.2%}"
-            )
-            st.dataframe(comparison_df, use_container_width=True, hide_index=True)
+        ].copy()
+        comparison_df["frequency_pct"] = comparison_df["frequency_pct"].map(
+            lambda value: f"{float(value):.1%}"
+        )
+        comparison_df["mean_ewma_vol"] = comparison_df["mean_ewma_vol"].map(
+            lambda value: f"{float(value):.2%}"
+        )
+        comparison_df["mean_cvar_95_60d"] = comparison_df["mean_cvar_95_60d"].map(
+            lambda value: f"{float(value):.2%}"
+        )
+        st.dataframe(comparison_df, use_container_width=True, hide_index=True)
 
 st.markdown(
     """
