@@ -115,3 +115,57 @@ class DurationSummaryRow(BaseModel):
     min_duration_trading_days: int
     total_obs: int
     frequency_pct: float
+
+
+class AdaptiveBacktestResultRow(BaseModel):
+    date: str
+    ret_1d: float
+    regime: int
+    regime_label: str
+    risk_order: int
+    p_regime_0: float
+    p_regime_1: float
+    p_regime_2: float
+    target_exposure: float
+    strategy_exposure: float
+    benchmark_return: float
+    strategy_return: float
+    benchmark_cum: float
+    strategy_cum: float
+    benchmark_drawdown: float
+    strategy_drawdown: float
+
+
+class AdaptiveBacktestMetricsRow(BaseModel):
+    sample: str
+    strategy: str
+    total_return: float
+    mean_daily_return: float
+    daily_volatility: float
+    annualized_volatility: float
+    VaR_95: float
+    CVaR_95: float
+    max_drawdown: float
+    n_observations: int
+    start_date: str
+    end_date: str
+
+
+class AdaptiveBacktestLatestResponse(BaseModel):
+    date: str
+    sample: str
+    regime: int
+    regime_label: str
+    risk_order: int
+    p_regime_0: float
+    p_regime_1: float
+    p_regime_2: float
+    target_exposure: float
+    strategy_exposure: float
+    benchmark_cum: float
+    strategy_cum: float
+    benchmark_drawdown: float
+    strategy_drawdown: float
+    benchmark_return: float
+    strategy_return: float
+    methodology: str

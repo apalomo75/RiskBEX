@@ -37,6 +37,17 @@ def _normalize_sample(sample):
     return normalized_sample
 
 
+def _validate_time_series(df, dataset_name):
+    if "date" not in df.columns:
+        return
+    if df["date"].isna().any():
+        raise ValueError(f"{dataset_name} has non-parseable date values.")
+    if df["date"].duplicated().any():
+        raise ValueError(f"{dataset_name} has duplicated date values.")
+    if not df["date"].is_monotonic_increasing:
+        raise ValueError(f"{dataset_name} dates are not sorted increasingly.")
+
+
 def load_master_dataset():
     return _load_dataset(MASTER_DATASET_PATH)
 
@@ -184,5 +195,76 @@ def load_regime_exposure_mapping(sample: str = "main"):
         df,
         ["regime", "economic_label", "risk_order", "target_exposure"],
         f"{normalized_sample} regime exposure mapping",
+    )
+    return df
+
+
+def load_adaptive_backtest_results(sample: str = "main"):
+    normalized_sample = _normalize_sample(sample)
+    filename = (
+        "adaptive_backtest_main.csv"
+        if normalized_sample == "main"
+        else "adaptive_backtest_robust.csv"
+    )
+    split_column = (
+        "sample_split_main"
+        if normalized_sample == "main"
+        else "sample_split_robust"
+    )
+    df = _load_dataset(PROCESSED_DATA_DIR / filename)
+    _validate_columns(
+        df,
+        [
+            "date",
+            "ret_1d",
+            split_column,
+            "regime",
+            "regime_label",
+            "risk_order",
+            "p_regime_0",
+            "p_regime_1",
+            "p_regime_2",
+            "target_exposure",
+            "strategy_exposure",
+            "benchmark_return",
+            "strategy_return",
+            "benchmark_cum",
+            "strategy_cum",
+            "benchmark_drawdown",
+            "strategy_drawdown",
+        ],
+        f"{normalized_sample} adaptive backtest results",
+    )
+    _validate_time_series(df, f"{normalized_sample} adaptive backtest results")
+    if df["target_exposure"].isna().any():
+        raise ValueError(
+            f"{normalized_sample} adaptive backtest results have null target_exposure."
+        )
+    if df["strategy_exposure"].isna().any():
+        raise ValueError(
+            f"{normalized_sample} adaptive backtest results have null strategy_exposure."
+        )
+    return df
+
+
+def load_adaptive_backtest_metrics():
+    df = _load_dataset(PROCESSED_DATA_DIR / "adaptive_backtest_metrics.csv")
+    _validate_columns(
+        df,
+        [
+            "sample",
+            "strategy",
+            "total_return",
+            "mean_daily_return",
+            "daily_volatility",
+            "annualized_volatility",
+            "VaR_95",
+            "CVaR_95",
+            "max_drawdown",
+            "n_observations",
+            "start_date",
+            "end_date",
+        ],
+        "adaptive backtest metrics",
     )
     return df
