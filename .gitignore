@@ -9,6 +9,8 @@ venv/
 # Secrets and local environment
 .env
 .env.*
+!.env.example
+!backend/.env.example
 .streamlit/secrets.toml
 
 # OS files

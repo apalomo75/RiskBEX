@@ -1,9 +1,10 @@
 import streamlit as st
 import requests
 import pandas as pd
+import os
 from pathlib import Path
 
-API_URL = "http://127.0.0.1:8000"
+API_URL = os.getenv("RISKBEX_API_URL", "http://127.0.0.1:8000")
 BASE_DIR = Path(__file__).resolve().parent
 FIGURES_DIR = BASE_DIR / "figures" / "chapter2"
 
@@ -611,10 +612,10 @@ try:
     df = load_historical_data()
 except Exception as e:
     st.markdown(
-        """
+        f"""
         <div class="panel-box">
             <h2>Error de conexión</h2>
-            <p>No se pudieron recuperar los datos desde la API local. Comprueba que FastAPI esté funcionando en http://127.0.0.1:8000.</p>
+            <p>No se pudieron recuperar los datos desde la API configurada. Comprueba que FastAPI esté funcionando en {API_URL}.</p>
         </div>
         """,
         unsafe_allow_html=True,
