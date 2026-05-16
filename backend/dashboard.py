@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import pandas as pd
 import os
+import matplotlib.pyplot as plt
 from pathlib import Path
 
 API_URL = os.getenv("RISKBEX_API_URL", "http://127.0.0.1:8000")
@@ -296,6 +297,49 @@ st.markdown(
         animation: fadeSlideUp 0.45s ease-out;
     }
 
+    .regime-card {
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 1rem;
+        box-shadow: var(--shadow);
+        min-height: 178px;
+        margin-bottom: 1rem;
+        animation: fadeSlideUp 0.45s ease-out;
+    }
+
+    .regime-card.low {
+        background: linear-gradient(180deg, rgba(102, 170, 120, 0.18), rgba(102, 170, 120, 0.07));
+    }
+
+    .regime-card.medium {
+        background: linear-gradient(180deg, rgba(210, 164, 80, 0.20), rgba(210, 164, 80, 0.07));
+    }
+
+    .regime-card.high {
+        background: linear-gradient(180deg, rgba(190, 90, 84, 0.20), rgba(190, 90, 84, 0.07));
+    }
+
+    .regime-card-title {
+        color: var(--muted);
+        font-size: 0.82rem;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        margin-bottom: 0.45rem;
+    }
+
+    .regime-card-label {
+        color: var(--sand-light);
+        font-size: 1.65rem;
+        font-weight: 800;
+        margin-bottom: 0.35rem;
+    }
+
+    .regime-card-detail {
+        color: #ddd4c9;
+        font-size: 0.92rem;
+        line-height: 1.55;
+    }
+
     .soft-caption {
         color: var(--muted);
         font-size: 0.92rem;
@@ -553,6 +597,172 @@ def load_historical_data():
     return df
 
 
+@st.cache_data(ttl=30)
+def fetch_regime_endpoint(path: str):
+    response = requests.get(f"{API_URL}{path}", timeout=10)
+    response.raise_for_status()
+    return response.json()
+
+
+def regime_card_class(economic_label: str):
+    label = (economic_label or "").lower()
+    if "low" in label:
+        return "low"
+    if "high" in label:
+        return "high"
+    return "medium"
+
+
+def render_regime_card(title: str, payload: dict):
+    probability = float(payload.get("dominant_probability", 0.0))
+    card_class = regime_card_class(payload.get("economic_label", ""))
+    st.markdown(
+        f"""
+        <div class="regime-card {card_class}">
+            <div class="regime-card-title">{title}</div>
+            <div class="regime-card-label">{payload.get("economic_label", "N/D")}</div>
+            <div class="regime-card-detail">
+                Probabilidad dominante<br>
+                <b>{probability:.1%}</b><br>
+                Orden de riesgo: <b>{int(payload.get("risk_order", 0))}</b><br>
+                Fecha: <b>{payload.get("date", "N/D")}</b>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def prepare_regime_history(records):
+    regime_df = pd.DataFrame(records)
+    if regime_df.empty:
+        return regime_df
+    regime_df["date"] = pd.to_datetime(regime_df["date"])
+    return regime_df.sort_values("date").reset_index(drop=True)
+
+
+def style_regime_axis(ax):
+    ax.set_facecolor("#171717")
+    ax.figure.set_facecolor("#171717")
+    ax.tick_params(colors="#ddd4c9")
+    ax.xaxis.label.set_color("#ddd4c9")
+    ax.yaxis.label.set_color("#ddd4c9")
+    ax.title.set_color("#f3ece3")
+    for spine in ax.spines.values():
+        spine.set_color("#4a4035")
+    ax.grid(color="#3a332d", alpha=0.35)
+
+
+def render_regime_timeline(history_df):
+    color_map = {
+        1: "#7fb58a",
+        2: "#d2a450",
+        3: "#be5a54",
+    }
+    fig, ax = plt.subplots(figsize=(10, 2.8))
+    colors = history_df["risk_order"].map(color_map).fillna("#d6c2a8")
+    ax.scatter(
+        history_df["date"],
+        history_df["risk_order"],
+        c=colors,
+        s=22,
+        alpha=0.9,
+        linewidths=0,
+    )
+    ax.set_yticks([1, 2, 3])
+    ax.set_yticklabels(["Low Risk", "Medium Risk", "High Risk"])
+    ax.set_xlabel("")
+    ax.set_ylabel("")
+    style_regime_axis(ax)
+    fig.autofmt_xdate()
+    st.pyplot(fig, use_container_width=True)
+    plt.close(fig)
+
+
+def render_transition_heatmap(transition_records):
+    transition_df = pd.DataFrame(transition_records)
+    if transition_df.empty:
+        st.info("No hay matriz de transición disponible.")
+        return
+
+    labels_df = (
+        transition_df[["from_label", "from_risk_order"]]
+        .drop_duplicates()
+        .sort_values("from_risk_order")
+    )
+    labels = labels_df["from_label"].tolist()
+    matrix = transition_df.pivot(
+        index="from_label",
+        columns="to_label",
+        values="transition_probability",
+    ).reindex(index=labels, columns=labels)
+
+    fig, ax = plt.subplots(figsize=(6.8, 4.2))
+    image = ax.imshow(matrix, cmap="YlOrBr", vmin=0, vmax=1)
+    ax.set_xticks(range(len(labels)))
+    ax.set_yticks(range(len(labels)))
+    ax.set_xticklabels(labels, rotation=25, ha="right")
+    ax.set_yticklabels(labels)
+    ax.set_xlabel("Destino")
+    ax.set_ylabel("Origen")
+    for row_idx in range(len(labels)):
+        for col_idx in range(len(labels)):
+            value = matrix.iloc[row_idx, col_idx]
+            ax.text(
+                col_idx,
+                row_idx,
+                f"{value:.1%}",
+                ha="center",
+                va="center",
+                color="#f8f6f2" if value < 0.55 else "#171717",
+                fontsize=9,
+                fontweight="bold",
+            )
+    style_regime_axis(ax)
+    colorbar = fig.colorbar(image, ax=ax, fraction=0.046, pad=0.04)
+    colorbar.ax.tick_params(colors="#ddd4c9")
+    fig.tight_layout()
+    st.pyplot(fig, use_container_width=True)
+    plt.close(fig)
+
+
+def render_duration_bars(duration_records):
+    duration_df = pd.DataFrame(duration_records)
+    if duration_df.empty:
+        st.info("No hay datos de duración disponibles.")
+        return
+    duration_df = duration_df.sort_values("risk_order")
+    labels = duration_df["economic_label"].tolist()
+    x_positions = range(len(labels))
+    width = 0.34
+
+    fig, ax = plt.subplots(figsize=(8.8, 3.4))
+    mean_positions = [pos - width / 2 for pos in x_positions]
+    median_positions = [pos + width / 2 for pos in x_positions]
+    ax.bar(
+        mean_positions,
+        duration_df["mean_duration_trading_days"],
+        width=width,
+        label="Media",
+        color="#d6c2a8",
+    )
+    ax.bar(
+        median_positions,
+        duration_df["median_duration_trading_days"],
+        width=width,
+        label="Mediana",
+        color="#7f8f7a",
+    )
+    ax.set_xticks(list(x_positions))
+    ax.set_xticklabels(labels)
+    ax.set_ylabel("Sesiones")
+    ax.legend(facecolor="#171717", edgecolor="#4a4035", labelcolor="#ddd4c9")
+    style_regime_axis(ax)
+    fig.tight_layout()
+    st.pyplot(fig, use_container_width=True)
+    plt.close(fig)
+
+
 def info_popover(title: str, text: str):
     with st.popover("ℹ"):
         st.markdown(
@@ -635,7 +845,9 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-tab1, tab2, tab3 = st.tabs(["Visión general", "Análisis histórico", "Figuras de investigación"])
+tab1, tab2, tab3, tab4 = st.tabs(
+    ["Visión general", "Análisis histórico", "Figuras de investigación", "Regímenes"]
+)
 
 with tab1:
     st.markdown('<div class="section-title">Estado actual del mercado</div>', unsafe_allow_html=True)
@@ -834,6 +1046,88 @@ with tab3:
         )
     else:
         st.warning(f"No se encontró la figura: {selected_path}")
+
+with tab4:
+    st.subheader("Regímenes Markov")
+
+    try:
+        latest_main = fetch_regime_endpoint("/regimes/latest?split=MAIN")
+        latest_robust = fetch_regime_endpoint("/regimes/latest?split=ROBUST")
+        history_120 = prepare_regime_history(
+            fetch_regime_endpoint("/regimes/history?split=MAIN&limit=120")
+        )
+        history_250 = prepare_regime_history(
+            fetch_regime_endpoint("/regimes/history?split=MAIN&limit=250")
+        )
+        transitions_main = fetch_regime_endpoint("/regimes/transitions?split=MAIN")
+        durations_main = fetch_regime_endpoint(
+            "/regimes/durations?split=MAIN&scope=FULL_FILTERED"
+        )
+        summary_records = fetch_regime_endpoint("/regimes/summary")
+    except Exception as e:
+        st.warning("No se pudieron cargar los endpoints de regímenes.")
+        st.caption(str(e))
+    else:
+        st.markdown('<div class="section-title">Estado actual del régimen</div>', unsafe_allow_html=True)
+        current_cols = st.columns(2)
+        with current_cols[0]:
+            render_regime_card("MAIN", latest_main)
+        with current_cols[1]:
+            render_regime_card("ROBUST", latest_robust)
+
+        st.markdown('<div class="section-title">Probabilidades filtradas</div>', unsafe_allow_html=True)
+        st.caption("Probabilidades filtradas del modelo Markov Switching")
+        if history_120.empty:
+            st.info("No hay histórico de probabilidades disponible.")
+        else:
+            probability_df = history_120.set_index("date")[
+                ["p_regime_0", "p_regime_1", "p_regime_2"]
+            ]
+            st.area_chart(probability_df, use_container_width=True)
+
+        st.markdown('<div class="section-title">Histórico reciente de regímenes</div>', unsafe_allow_html=True)
+        if history_250.empty:
+            st.info("No hay histórico de regímenes disponible.")
+        else:
+            render_regime_timeline(history_250)
+
+        heatmap_col, duration_col = st.columns(2)
+        with heatmap_col:
+            st.markdown('<div class="section-title">Heatmap de transición</div>', unsafe_allow_html=True)
+            render_transition_heatmap(transitions_main)
+            st.caption(
+                "Las probabilidades diagonales elevadas reflejan persistencia de régimen."
+            )
+
+        with duration_col:
+            st.markdown('<div class="section-title">Persistencia / duraciones</div>', unsafe_allow_html=True)
+            render_duration_bars(durations_main)
+            st.caption("Duración media de bloques consecutivos de régimen.")
+
+        st.markdown('<div class="section-title">Comparación MAIN vs ROBUST</div>', unsafe_allow_html=True)
+        summary_df = pd.DataFrame(summary_records)
+        if summary_df.empty:
+            st.info("No hay resumen de regímenes disponible.")
+        else:
+            comparison_df = summary_df[
+                [
+                    "split",
+                    "economic_label",
+                    "frequency_pct",
+                    "mean_ewma_vol",
+                    "mean_cvar_95_60d",
+                ]
+            ].copy()
+            comparison_df["frequency_pct"] = comparison_df["frequency_pct"].map(
+                lambda value: f"{float(value):.1%}"
+            )
+            comparison_df["mean_ewma_vol"] = comparison_df["mean_ewma_vol"].map(
+                lambda value: f"{float(value):.2%}"
+            )
+            comparison_df["mean_cvar_95_60d"] = comparison_df["mean_cvar_95_60d"].map(
+                lambda value: f"{float(value):.2%}"
+            )
+            st.dataframe(comparison_df, use_container_width=True, hide_index=True)
 
 st.markdown(
     """
