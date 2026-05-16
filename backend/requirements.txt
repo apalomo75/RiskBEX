@@ -9,5 +9,6 @@ arch
 jupyter
 notebook
 fastapi
+uvicorn
 streamlit
 requests

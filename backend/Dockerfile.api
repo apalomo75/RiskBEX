@@ -1,0 +1,19 @@
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1
+ENV RISKBEX_DATA_DIR=/app/data
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY main.py .
+COPY src ./src
+COPY scripts ./scripts
+
+RUN mkdir -p /app/data/raw /app/data/processed /app/figures/chapter2
+
+EXPOSE 8000
+
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
