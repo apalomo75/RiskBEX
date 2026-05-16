@@ -351,6 +351,13 @@ st.markdown(
         margin-bottom: 0.75rem;
     }
 
+    .uncertainty-note {
+        color: #ddd4c9;
+        font-size: 0.92rem;
+        line-height: 1.55;
+        margin-top: 0.4rem;
+    }
+
     .soft-caption {
         color: var(--muted);
         font-size: 0.92rem;
@@ -667,6 +674,112 @@ def render_regime_card(title: str, payload: dict):
         """,
         unsafe_allow_html=True,
     )
+
+
+def regime_probabilities(record):
+    return [
+        float(record.get("p_regime_0", 0.0)),
+        float(record.get("p_regime_1", 0.0)),
+        float(record.get("p_regime_2", 0.0)),
+    ]
+
+
+def confidence_label(dominant_probability):
+    if dominant_probability >= 0.80:
+        return "Alta confianza"
+    if dominant_probability >= 0.60:
+        return "Confianza moderada"
+    return "Zona de transición"
+
+
+def uncertainty_metrics(record):
+    probabilities = sorted(regime_probabilities(record), reverse=True)
+    dominant_probability = probabilities[0]
+    second_probability = probabilities[1]
+    probability_gap = dominant_probability - second_probability
+    return {
+        "dominant_probability": dominant_probability,
+        "second_probability": second_probability,
+        "probability_gap": probability_gap,
+        "confidence_label": confidence_label(dominant_probability),
+    }
+
+
+def render_uncertainty_card(split: str, latest_payload: dict):
+    if not latest_payload:
+        st.info("No hay datos suficientes para calcular incertidumbre probabilística.")
+        return
+    metrics = uncertainty_metrics(latest_payload)
+    gap_note = (
+        "El gap es estrecho: hay mezcla relevante entre estados de riesgo."
+        if metrics["probability_gap"] < 0.20
+        else "El régimen dominante se separa con claridad del segundo estado."
+    )
+    st.markdown(
+        f"""
+        <div class="panel-box">
+            <div class="regime-card-title">Incertidumbre probabilística · {split}</div>
+            <div class="regime-card-label">{metrics["confidence_label"]}</div>
+            <div class="regime-card-detail">
+                Probabilidad dominante: <b>{metrics["dominant_probability"]:.1%}</b><br>
+                Segunda probabilidad: <b>{metrics["second_probability"]:.1%}</b><br>
+                Gap probabilístico: <b>{metrics["probability_gap"]:.1%}</b>
+            </div>
+            <div class="uncertainty-note">
+                {gap_note}<br>
+                Las probabilidades filtradas permiten representar transiciones graduales entre estados de riesgo.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def add_uncertainty_columns(history_df):
+    working_df = history_df.copy()
+    probability_columns = ["p_regime_0", "p_regime_1", "p_regime_2"]
+    sorted_probabilities = working_df[probability_columns].apply(
+        lambda row: sorted([float(value) for value in row], reverse=True),
+        axis=1,
+    )
+    working_df["dominant_probability"] = sorted_probabilities.apply(lambda values: values[0])
+    working_df["second_probability"] = sorted_probabilities.apply(lambda values: values[1])
+    working_df["probability_gap"] = (
+        working_df["dominant_probability"] - working_df["second_probability"]
+    )
+    return working_df
+
+
+def render_uncertainty_chart(history_df):
+    if history_df.empty:
+        st.info("No hay histórico suficiente para visualizar incertidumbre.")
+        return
+    uncertainty_df = add_uncertainty_columns(history_df)
+    fig, ax = plt.subplots(figsize=(10, 3.2))
+    ax.plot(
+        uncertainty_df["date"],
+        uncertainty_df["dominant_probability"],
+        color="#d6c2a8",
+        linewidth=2.0,
+        label="Probabilidad dominante",
+    )
+    ax.plot(
+        uncertainty_df["date"],
+        uncertainty_df["probability_gap"],
+        color="#7f8f7a",
+        linewidth=1.8,
+        label="Gap dominante-segunda",
+    )
+    ax.axhline(0.80, color="#7fb58a", linewidth=1.0, linestyle="--", alpha=0.55)
+    ax.axhline(0.60, color="#d2a450", linewidth=1.0, linestyle="--", alpha=0.55)
+    ax.set_ylim(0, 1)
+    ax.set_ylabel("Probabilidad")
+    ax.legend(facecolor="#171717", edgecolor="#4a4035", labelcolor="#ddd4c9")
+    style_regime_axis(ax)
+    fig.autofmt_xdate()
+    fig.tight_layout()
+    st.pyplot(fig, use_container_width=True)
+    plt.close(fig)
 
 
 def prepare_regime_history(records):
@@ -1156,6 +1269,16 @@ with tab4:
         st.info("No hay histórico de regímenes disponible.")
     else:
         render_regime_timeline(history_250)
+
+    st.markdown('<div class="section-title">Incertidumbre probabilística</div>', unsafe_allow_html=True)
+    uncertainty_col, uncertainty_chart_col = st.columns([1, 2])
+    with uncertainty_col:
+        render_uncertainty_card(split_selected, latest_selected)
+    with uncertainty_chart_col:
+        render_uncertainty_chart(history_250)
+        st.caption(
+            "Umbrales operativos: alta confianza desde 80%, confianza moderada entre 60% y 80%, y zona de transición por debajo de 60%."
+        )
 
     heatmap_col, duration_col = st.columns(2)
     with heatmap_col:
