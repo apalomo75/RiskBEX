@@ -5,7 +5,12 @@ class HealthResponse(BaseModel):
     status: str
 
 
-class LatestRiskResponse(BaseModel):
+class PublicationResponse(BaseModel):
+    publication: dict | None = None
+
+
+class LatestRiskResponse(PublicationResponse):
+    signal: dict | None = None
     date: str
     vol_20d: float
     vol_60d: float
@@ -14,11 +19,11 @@ class LatestRiskResponse(BaseModel):
     drawdown: float
     skew_60d: float
     regime_label: str
-    risk_score: int
+    risk_score: int | None
     risk_level: str | None
 
 
-class HistoricalRiskPoint(BaseModel):
+class HistoricalRiskPoint(PublicationResponse):
     date: str
     vol_20d: float
     vol_60d: float
@@ -27,7 +32,7 @@ class HistoricalRiskPoint(BaseModel):
     drawdown: float
     skew_60d: float
     regime_label: str
-    risk_score: int
+    risk_score: int | None
     risk_level: str | None
 
 
@@ -39,7 +44,8 @@ class RunUpdateResponse(BaseModel):
     returncode: int | None
 
 
-class RegimeLatestResponse(BaseModel):
+class RegimeLatestResponse(PublicationResponse):
+    signal: dict | None = None
     date: str
     split: str
     regime: int
@@ -51,7 +57,7 @@ class RegimeLatestResponse(BaseModel):
     dominant_probability: float
 
 
-class RegimeHistoryPoint(BaseModel):
+class RegimeHistoryPoint(PublicationResponse):
     date: str
     split: str
     regime: int
@@ -117,7 +123,7 @@ class DurationSummaryRow(BaseModel):
     frequency_pct: float
 
 
-class AdaptiveBacktestResultRow(BaseModel):
+class AdaptiveBacktestResultRow(PublicationResponse):
     date: str
     ret_1d: float
     regime: int
@@ -136,7 +142,7 @@ class AdaptiveBacktestResultRow(BaseModel):
     strategy_drawdown: float
 
 
-class AdaptiveBacktestMetricsRow(BaseModel):
+class AdaptiveBacktestMetricsRow(PublicationResponse):
     sample: str
     strategy: str
     total_return: float
@@ -151,7 +157,8 @@ class AdaptiveBacktestMetricsRow(BaseModel):
     end_date: str
 
 
-class AdaptiveBacktestLatestResponse(BaseModel):
+class AdaptiveBacktestLatestResponse(PublicationResponse):
+    signal: dict | None = None
     date: str
     sample: str
     regime: int

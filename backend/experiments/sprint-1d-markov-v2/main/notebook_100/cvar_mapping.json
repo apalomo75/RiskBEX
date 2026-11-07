@@ -1,0 +1,35 @@
+[
+  {
+    "regime": 0,
+    "economic_label": "low_risk",
+    "risk_order": 1,
+    "target_exposure": 1.0,
+    "mean_cvar_95_60d": -0.0184036239537792,
+    "cvar_severity_abs": "0.018403623953779272",
+    "cvar_low_abs": "0.018403623953779272",
+    "defensive_alpha": 1.0,
+    "methodology": "CVaR_train_abs_ratio"
+  },
+  {
+    "regime": 2,
+    "economic_label": "medium_risk",
+    "risk_order": 2,
+    "target_exposure": 0.5905564268560006,
+    "mean_cvar_95_60d": -0.0311631930783588,
+    "cvar_severity_abs": "0.03116319307835888",
+    "cvar_low_abs": "0.018403623953779272",
+    "defensive_alpha": 1.0,
+    "methodology": "CVaR_train_abs_ratio"
+  },
+  {
+    "regime": 1,
+    "economic_label": "high_risk",
+    "risk_order": 3,
+    "target_exposure": 0.3555517372976262,
+    "mean_cvar_95_60d": -0.0517607482209373,
+    "cvar_severity_abs": "0.0517607482209373",
+    "cvar_low_abs": "0.018403623953779272",
+    "defensive_alpha": 1.0,
+    "methodology": "CVaR_train_abs_ratio"
+  }
+]

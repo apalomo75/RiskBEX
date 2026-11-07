@@ -1,0 +1,28 @@
+{
+  "status": "sprint2_offline_main_ready_daily_not_activated",
+  "unique_tests_verified": 79,
+  "backend_passed": 61,
+  "backend_runtime_specific_skips": 18,
+  "native_engine_tests_passed": 11,
+  "native_markov_tests_passed": 4,
+  "native_xgboost_tests_passed": 3,
+  "protected_files_checked": 290,
+  "protected_files_changed": [],
+  "package_manifest_sha256": "1e63e51d70278a60188db1351f5f5e081f8cfa011d82ce0012317ac4f676a68c",
+  "implementation_sha256": {
+    "src/riskbex/engine/__init__.py": "e051e3182ebca81f3915673ec7c19a9868bc878b0c32b29c4554848bceffb45b",
+    "src/riskbex/engine/package.py": "5dabd4c9757de121e78f43672e90494c5deff5cea9030a9d35f0a3b1f48fbfb4",
+    "src/riskbex/engine/service.py": "2e9854bb9553ca3c9ad66ac8f92c5a088cbf60aed24a9eb90fd8b6624c2b1a48",
+    "src/riskbex/features/market.py": "445e2fd749b89ca90ba79f21675d309e4a5f1d7a718946962e91eb861a5bc857",
+    "scripts/build_main_package.py": "b54db1194a45abaa005bdf24f407b9ec011e028f028f293464e3dd52e925964e",
+    "scripts/run_main_offline.py": "46677a1719d3fa2df2814ef05630b7cdedeb4ebcac924ff8c482072e684c4dd7",
+    "scripts/check_main_engine.py": "f9d8bae54e686e98822984e98c754e099db98fecd43427a28914c6b06f707b37",
+    "tests/test_main_engine.py": "9f0a4dfc8c2ad6835197c1e9e3f01c0b0a2cb0d9d286edcf237939c61aacb95a"
+  },
+  "report_sha256": {
+    "signal-2026-04-23.json": "33c18bde0713e41f251f380cf9099ffa9d4da9af3afe37f5c698099d74b371bd",
+    "offline_validation.json": "f981fc7b85aea363949b42786c685c715b8c6ffc9057cbf9b63e69ae1300d4ab",
+    "signal-2021-01-04.json": "fbe71677a8e06bb2aa82e1f75d6a6fb277d7a4e3ddea03fd70c447984f9ef43e",
+    "signal-2026-05-15.json": "0957647b9e420ec29f2184365b5a986b1cb8ccc04a4e3433cececdbc59c21406"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "distinct_passed": 103,
+  "distinct_unverified": [],
+  "failed_final": 0,
+  "per_environment": {
+    "all-tests-backend.txt": {
+      "passed": 73,
+      "skipped": 30,
+      "summary": "----------------------------------------------------------------------\nRan 103 tests in 10.827s\n\nOK (skipped=30)"
+    },
+    "pipeline-tests-accepted.txt": {
+      "passed": 24,
+      "skipped": 0,
+      "summary": "----------------------------------------------------------------------\nRan 24 tests in 133.619s\n\nOK"
+    },
+    "previous-native-tests.txt": {
+      "passed": 25,
+      "skipped": 0,
+      "summary": "----------------------------------------------------------------------\nRan 25 tests in 134.791s\n\nOK"
+    }
+  },
+  "scope": "Only these final suites are acceptance evidence; earlier development runs superseded."
+}

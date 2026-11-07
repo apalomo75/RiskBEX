@@ -1,0 +1,24 @@
+{
+  "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+  "xgboost_build": {
+    "BUILTIN_PREFETCH_PRESENT": true,
+    "DEBUG": false,
+    "GCC_VERSION": [
+      14,
+      3,
+      0
+    ],
+    "GLIBC_VERSION": [
+      2,
+      17
+    ],
+    "MM_PREFETCH_PRESENT": true,
+    "USE_CUDA": false,
+    "USE_DLOPEN_NCCL": false,
+    "USE_FEDERATED": false,
+    "USE_NCCL": false,
+    "USE_OPENMP": true,
+    "USE_RMM": false,
+    "libxgboost": "/home/apalo/miniconda3/envs/fin-forecasting/lib/libxgboost.so"
+  }
+}

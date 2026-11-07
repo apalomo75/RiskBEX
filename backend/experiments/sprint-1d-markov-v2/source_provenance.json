@@ -1,0 +1,111 @@
+{
+  "reference_commit": "8dd66a93c06dc3cbfaac29f086ad2625d32d9756",
+  "notebook_hashes": {
+    "notebooks/05_xgboost_regime_classifier.ipynb": "6faa69af9fddb957c9d88fa6ace8053d7fbac9ffd8ab6843d512f6507f4486c3",
+    "notebooks/01_data_download_and_preprocessing.ipynb": "322918f15ccc3f2c62f61c1445737bc15e011ed9e1911bda575d0a37e872dadb",
+    "notebooks/02_feature_engineering_risk_variables.ipynb": "6ca1c1e27974f0caad7de58babb314826595f466acc86842f31d91463425edc6"
+  },
+  "frozen_master_sha256": "1209353c399b0aac85ba8affacf8cafdec4894be5e07440232a7cc8fc829fbe1",
+  "git_raw_prices_sha256": "8a7ce329e83eefd32266a88d17b02a641998ab26c891af72eedda70fef44ed12",
+  "ml_fixture_manifest_sha256": "62a6e90cd54e867f7175fe273aed239fc7348120f20e5c528aed4d1da3470167",
+  "cvar_fixture_manifest_sha256": "7ad46031b9cd323c065efa2542ef53caff71e76ee2db9e5cf52ae4aa2421b008",
+  "feature_reconstruction_max_errors": {
+    "ret_1d": 0.0,
+    "ret_20d": 9.974659986866641e-17,
+    "ret_60d": 9.90960785651751e-17,
+    "ewma_vol": 9.974659986866641e-17,
+    "vol_20d": 9.974659986866641e-17,
+    "vol_60d": 9.974659986866641e-17,
+    "downside_vol_20d": 9.985502008591496e-17,
+    "downside_vol_60d": 9.974659986866641e-17,
+    "cvar_95_60d": 9.8879238130678e-17,
+    "drawdown": 9.93129189996722e-17,
+    "skew_60d": 3.980704654793499e-13
+  },
+  "samples": {
+    "main": {
+      "regimes_sha256": "7b23766dc9a6f8d440d2523dc8e5e61d069b866b1e8403a0a44d2c064d15b1db",
+      "saved_train_sha256": "c980c252497a8c9a1226d83f22d81b9ba941ce504e0fc12f1382a41df53ffdb0",
+      "saved_train_source": "data/processed/dataset_cap4_regimes_train.csv",
+      "predictions_sha256": "c6732d7cb061cc8021f0083acf42f39d484cf70713c2e87a1ec9802a02c01800",
+      "historical_train_rows": 5274,
+      "purged_train_rows": 5273,
+      "first_feature_date": "2000-03-28",
+      "last_feature_date": "2020-12-30",
+      "last_label_date": "2020-12-31",
+      "removed_boundary_feature_date": "2020-12-31",
+      "oos_rows": 1357,
+      "oos_first_date": "2021-01-04",
+      "oos_last_date": "2026-04-23",
+      "original_oos_rows": 1376,
+      "excluded_original_dates": [
+        "2026-04-24",
+        "2026-04-27",
+        "2026-04-28",
+        "2026-04-29",
+        "2026-04-30",
+        "2026-05-04",
+        "2026-05-05",
+        "2026-05-06",
+        "2026-05-07",
+        "2026-05-08",
+        "2026-05-11",
+        "2026-05-12",
+        "2026-05-13",
+        "2026-05-14",
+        "2026-05-15",
+        "2026-05-18",
+        "2026-05-19",
+        "2026-05-20",
+        "2026-05-21"
+      ],
+      "class_counts": {
+        "2": 2582,
+        "0": 2046,
+        "1": 645
+      }
+    },
+    "robust": {
+      "regimes_sha256": "0f678bfa3b3008907e3c35002fbb1be145c78777ce1aa631fd48c7608ec1704f",
+      "saved_train_sha256": "83d96a15723b6faf923b83e0639610d00695e616988f45ec21f953e5c74bbfb7",
+      "saved_train_source": "data/processed/dataset_cap4_regimes_train_robust.csv",
+      "predictions_sha256": "82e461b15d770404e9251021ed38eee2fd91cef9c371a23d9234dbdc92edb5ba",
+      "historical_train_rows": 5017,
+      "purged_train_rows": 5016,
+      "first_feature_date": "2000-03-28",
+      "last_feature_date": "2019-12-30",
+      "last_label_date": "2019-12-31",
+      "removed_boundary_feature_date": "2019-12-31",
+      "oos_rows": 1614,
+      "oos_first_date": "2020-01-02",
+      "oos_last_date": "2026-04-23",
+      "original_oos_rows": 1633,
+      "excluded_original_dates": [
+        "2026-04-24",
+        "2026-04-27",
+        "2026-04-28",
+        "2026-04-29",
+        "2026-04-30",
+        "2026-05-04",
+        "2026-05-05",
+        "2026-05-06",
+        "2026-05-07",
+        "2026-05-08",
+        "2026-05-11",
+        "2026-05-12",
+        "2026-05-13",
+        "2026-05-14",
+        "2026-05-15",
+        "2026-05-18",
+        "2026-05-19",
+        "2026-05-20",
+        "2026-05-21"
+      ],
+      "class_counts": {
+        "1": 2388,
+        "0": 2024,
+        "2": 604
+      }
+    }
+  }
+}

@@ -29,3 +29,6 @@ figures/
 backend/figures/
 
 # Source code lives under backend/src/ and must not be ignored.
+
+# Versioned live results (models and frozen fixtures stay tracked)
+backend/runtime/

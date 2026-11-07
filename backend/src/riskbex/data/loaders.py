@@ -52,6 +52,20 @@ def load_master_dataset():
     return _load_dataset(MASTER_DATASET_PATH)
 
 
+def load_ml_predictions(sample="main", *, path=None):
+    """Read explicit ML outputs without falling back to heuristics or fitting models."""
+    from src.riskbex.ml.inference import validate_predictions
+
+    name = _normalize_sample(sample)
+    suffix = "" if name == "main" else "_robust"
+    source = path if path is not None else PROCESSED_DATA_DIR / f"dataset_cap5_regime_predictions{suffix}.csv"
+    # Do not use _load_dataset: it sorts and could hide incorrect signal ordering.
+    output = validate_predictions(pd.read_csv(source))
+    column = f"sample_split_{name}"
+    _validate_columns(output, [column, "ret_1d"], f"{name} ML predictions")
+    return output
+
+
 def load_cap4_input_dataset():
     return _load_dataset(CAP4_INPUT_PATH)
 

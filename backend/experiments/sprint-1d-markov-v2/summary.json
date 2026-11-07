@@ -1,0 +1,83 @@
+{
+  "status": "blocked_stop_for_review",
+  "versions": {
+    "python": "3.11.14",
+    "statsmodels": "0.14.5",
+    "numpy": "2.3.4",
+    "pandas": "2.3.3",
+    "scipy": "1.16.2"
+  },
+  "samples": {
+    "main": {
+      "candidates": [
+        {
+          "recipe": {
+            "name": "notebook_100",
+            "maxiter": 100
+          },
+          "converged": false,
+          "log_likelihood": 15669.366940542592,
+          "max_probability_error": 2.220446049250313e-16,
+          "train_regime_mismatches": 0,
+          "full_regime_mismatches": 0,
+          "same_economic_ids": true,
+          "same_train_cvar_mapping": true,
+          "historical_probability_equivalence": true,
+          "technical_validation": "failed"
+        },
+        {
+          "recipe": {
+            "name": "convergence_500",
+            "maxiter": 500
+          },
+          "converged": true,
+          "log_likelihood": 15669.36796559226,
+          "max_probability_error": 0.001809439739726637,
+          "train_regime_mismatches": 0,
+          "full_regime_mismatches": 0,
+          "same_economic_ids": true,
+          "same_train_cvar_mapping": true,
+          "historical_probability_equivalence": false,
+          "technical_validation": "passed"
+        }
+      ],
+      "selected_technical_candidate": "convergence_500"
+    },
+    "robust": {
+      "candidates": [
+        {
+          "recipe": {
+            "name": "notebook_100",
+            "maxiter": 100
+          },
+          "converged": false,
+          "log_likelihood": 14999.238018749485,
+          "max_probability_error": 1.1102230246251565e-16,
+          "train_regime_mismatches": 0,
+          "full_regime_mismatches": 0,
+          "same_economic_ids": true,
+          "same_train_cvar_mapping": true,
+          "historical_probability_equivalence": true,
+          "technical_validation": "failed"
+        },
+        {
+          "recipe": {
+            "name": "convergence_500",
+            "maxiter": 500
+          },
+          "converged": true,
+          "log_likelihood": 14999.544490076976,
+          "max_probability_error": 0.04697794737504313,
+          "train_regime_mismatches": 35,
+          "full_regime_mismatches": 50,
+          "same_economic_ids": true,
+          "same_train_cvar_mapping": false,
+          "historical_probability_equivalence": false,
+          "technical_validation": "failed"
+        }
+      ],
+      "selected_technical_candidate": null
+    }
+  },
+  "pair_compatible": false
+}

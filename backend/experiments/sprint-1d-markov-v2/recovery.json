@@ -1,0 +1,39 @@
+{
+  "status": "partial_rounded_main_only_not_original_full_precision_parameters",
+  "source_git_blob": "a040cd6d3020a861c99bdc3aee0febe5be4b6ce7",
+  "source_path": "notebooks/03_market_regime_identification.ipynb",
+  "source_cell": 15,
+  "source_sha256": "2b9a66a38e56bb91e19479ec6b81c0e3284bd9548e009def9f31040a1beae141",
+  "main_summary_output": "\n================================================================================\nMODELO 2 - Markov Switching (3 reg\u00edmenes)\n================================================================================\n                        Markov Switching Model Results                        \n==============================================================================\nDep. Variable:                 ret_1d   No. Observations:                 5274\nModel:               MarkovRegression   Log Likelihood               15669.367\nDate:                Sun, 03 May 2026   AIC                         -31314.734\nTime:                        12:34:59   BIC                         -31235.887\nSample:                             0   HQIC                        -31287.174\n                               - 5274                                         \nCovariance Type:               approx                                         \n                             Regime 0 parameters                              \n==============================================================================\n                 coef    std err          z      P>|z|      [0.025      0.975]\n------------------------------------------------------------------------------\nconst          0.0009      0.000      4.931      0.000       0.001       0.001\nsigma2      5.453e-05   3.11e-06     17.560      0.000    4.84e-05    6.06e-05\n                             Regime 1 parameters                              \n==============================================================================\n                 coef    std err          z      P>|z|      [0.025      0.975]\n------------------------------------------------------------------------------\nconst         -0.0016      0.001     -1.478      0.139      -0.004       0.001\nsigma2         0.0008   4.42e-05     18.026      0.000       0.001       0.001\n                             Regime 2 parameters                              \n==============================================================================\n                 coef    std err          z      P>|z|      [0.025      0.975]\n------------------------------------------------------------------------------\nconst         -0.0005      0.000     -1.670      0.095      -0.001     8.4e-05\nsigma2         0.0002   4.19e-06     45.360      0.000       0.000       0.000\n                         Regime transition parameters                         \n==============================================================================\n                 coef    std err          z      P>|z|      [0.025      0.975]\n------------------------------------------------------------------------------\np[0->0]        0.9806      0.005    198.797      0.000       0.971       0.990\np[1->0]     1.233e-06        nan        nan        nan         nan         nan\np[2->0]        0.0167      0.004      3.780      0.000       0.008       0.025\np[0->1]     1.202e-07        nan        nan        nan         nan         nan\np[1->1]        0.9661        nan        nan        nan         nan         nan\np[2->1]        0.0099      0.002      4.050      0.000       0.005       0.015\n==============================================================================\n\nWarnings:\n[1] Covariance matrix calculated using numerical (complex-step) differentiation.\nLog-likelihood: 15,669.366941\nAIC: -31,314.733881\nBIC: -31,235.887349\n\nComparaci\u00f3n de modelos:\n",
+  "rounded_main_parameters": [
+    0.9806,
+    1.233e-06,
+    0.0167,
+    1.202e-07,
+    0.9661,
+    0.0099,
+    0.0009,
+    -0.0016,
+    -0.0005,
+    5.453e-05,
+    0.0008,
+    0.0002
+  ],
+  "full_precision_vectors_recovered": false,
+  "robust_parameters_recovered": false,
+  "original_statsmodels_version": "not_accredited",
+  "initialization_evidence": "No initialization override in original code; recorded runtime default is steady-state.",
+  "search_scope": "Both local trees and all reachable Git notebook blobs/model filenames; 42 TFM notebook blobs, no serialized models in Git.",
+  "original_notebook_metrics": {
+    "main": {
+      "aic": -31314.733881085183,
+      "bic": -31235.887348682223,
+      "log_likelihood_from_aic_12_parameters": 15669.366940542592
+    },
+    "robust": {
+      "aic": -29974.47603749897,
+      "bic": -29896.22898840516,
+      "log_likelihood_from_aic_12_parameters": 14999.238018749485
+    }
+  }
+}

@@ -1,0 +1,498 @@
+{
+  "status": "candidate_frozen_historical_predictions_not_trained_models",
+  "tfm_head": "8dd66a93c06dc3cbfaac29f086ad2625d32d9756",
+  "source_state": "local working tree, May 2026 research outputs",
+  "sources": {
+    "main_predictions": {
+      "source_path": "data/processed/dataset_cap5_regime_predictions.csv",
+      "sha256": "c6732d7cb061cc8021f0083acf42f39d484cf70713c2e87a1ec9802a02c01800",
+      "fixture": "main_predictions.csv.gz",
+      "rows": 1376,
+      "first_date": "2021-01-04",
+      "last_date": "2026-05-21"
+    },
+    "main_ml_backtest": {
+      "source_path": "data/processed/backtest_ml_results.csv",
+      "sha256": "53b86c00f957bd536a99728e21b5657d9f2a1b312a6efa41d9c584233ce13ebf",
+      "fixture": "main_ml_backtest.csv.gz",
+      "rows": 1375,
+      "first_date": "2021-01-05",
+      "last_date": "2026-05-21"
+    },
+    "main_regime_backtest": {
+      "source_path": "data/processed/backtest_oos_results.csv",
+      "sha256": "5c7342f6b0720e7563bda5108607e709aba383e1b5a5f08a19a965b9f37f7f4d",
+      "fixture": "main_regime_backtest.csv.gz",
+      "rows": 1376,
+      "first_date": "2021-01-05",
+      "last_date": "2026-05-22"
+    },
+    "main_mapping": {
+      "source_path": "tables/chapter4/regime_exposure_mapping.csv",
+      "sha256": "c0dd13e48b34cd1c76b153e16554322a83d04600d2a4a50dae1ad00f13193fd4"
+    },
+    "main_cost_metrics": {
+      "source_path": "tables/chapter6/ml_performance_metrics_with_costs.csv",
+      "sha256": "b1cc226ee0ae2aa3af87eac276ca41cecd0f09601ec7430345f5357b20a9dd57"
+    },
+    "main_turnover": {
+      "source_path": "tables/chapter6/ml_turnover_metrics.csv",
+      "sha256": "b1ced685d4f3de81cf8e918f12120c76b2a63a8fb863366f265e36f44b4b9640"
+    },
+    "main_classification_rounded": {
+      "source_path": "tables/chapter5/regime_prediction_metrics.csv",
+      "sha256": "cd5d09ffb790c0a835d9b6a232f8ff3205180121d2e2ef61c805ffaf8f190a68"
+    },
+    "main_common_metrics": {
+      "source_path": "tables/chapter6/final_performance_metrics_main.csv",
+      "sha256": "621bd8a26fb48e9db25e0824927f1855f77624606fcd7a1d02fad8700419909c"
+    },
+    "robust_predictions": {
+      "source_path": "data/processed/dataset_cap5_regime_predictions_robust.csv",
+      "sha256": "82e461b15d770404e9251021ed38eee2fd91cef9c371a23d9234dbdc92edb5ba",
+      "fixture": "robust_predictions.csv.gz",
+      "rows": 1633,
+      "first_date": "2020-01-02",
+      "last_date": "2026-05-21"
+    },
+    "robust_ml_backtest": {
+      "source_path": "data/processed/backtest_ml_results_robust.csv",
+      "sha256": "4b41ebaf18296c78497bb0ab2077ca7b1e4b70d608e70734b3e5a26d8c67b049",
+      "fixture": "robust_ml_backtest.csv.gz",
+      "rows": 1632,
+      "first_date": "2020-01-03",
+      "last_date": "2026-05-21"
+    },
+    "robust_regime_backtest": {
+      "source_path": "data/processed/backtest_oos_results_robust.csv",
+      "sha256": "c167447eb161c8ef1dc96505575772405ebcd067db9d3867a515f9ed59757553",
+      "fixture": "robust_regime_backtest.csv.gz",
+      "rows": 1633,
+      "first_date": "2020-01-03",
+      "last_date": "2026-05-22"
+    },
+    "robust_mapping": {
+      "source_path": "tables/chapter4/regime_exposure_mapping_robust.csv",
+      "sha256": "ac7ecc7ec4be7a6f2f6ba8c7ff99513faf72eff14c582ba4998a863e4669d2ca"
+    },
+    "robust_cost_metrics": {
+      "source_path": "tables/chapter6/ml_performance_metrics_with_costs_robust.csv",
+      "sha256": "bc78d633aede5415a9bfbee6fe46a54a002b702684b9eac9d11135be430cecf5"
+    },
+    "robust_turnover": {
+      "source_path": "tables/chapter6/ml_turnover_metrics_robust.csv",
+      "sha256": "119b2f4847f1b2748292515d44ad3d7eaa5b570cd71cbbb5d6ddd1104216f4bf"
+    },
+    "robust_classification_rounded": {
+      "source_path": "tables/chapter5/regime_prediction_metrics_robust.csv",
+      "sha256": "6bfeae825829b7870fc1a3032db5c9a3547ef80a52927df5527ab772ebd5bc35"
+    },
+    "robust_common_metrics": {
+      "source_path": "tables/chapter6/final_performance_metrics_robust.csv",
+      "sha256": "027ea1d19381acdb011a5b3cd1b6469048c03040985bb3f35e4ef0c227beddfc"
+    },
+    "historical_master": {
+      "source_path": "data/processed/dataset_cap3_master.csv",
+      "git_commit": "8dd66a93c06dc3cbfaac29f086ad2625d32d9756",
+      "sha256": "1209353c399b0aac85ba8affacf8cafdec4894be5e07440232a7cc8fc829fbe1",
+      "fixture": "historical_master.csv.gz",
+      "rows": 6631,
+      "first_date": "2000-03-28",
+      "last_date": "2026-04-23",
+      "status": "older_historical_candidate_complete_train_coverage_not_verified_as_final_may_run"
+    }
+  },
+  "tables": {
+    "main_mapping": [
+      {
+        "regime": "0",
+        "economic_label": "low_risk",
+        "risk_order": "1",
+        "target_exposure": "1.0",
+        "mean_cvar_95_60d": "-0.018403623953779272",
+        "cvar_severity_abs": "0.018403623953779272",
+        "cvar_low_abs": "0.018403623953779272",
+        "defensive_alpha": "1.0",
+        "methodology": "CVaR_train_abs_ratio"
+      },
+      {
+        "regime": "2",
+        "economic_label": "medium_risk",
+        "risk_order": "2",
+        "target_exposure": "0.5905564268560006",
+        "mean_cvar_95_60d": "-0.03116319307835888",
+        "cvar_severity_abs": "0.03116319307835888",
+        "cvar_low_abs": "0.018403623953779272",
+        "defensive_alpha": "1.0",
+        "methodology": "CVaR_train_abs_ratio"
+      },
+      {
+        "regime": "1",
+        "economic_label": "high_risk",
+        "risk_order": "3",
+        "target_exposure": "0.35555173729762624",
+        "mean_cvar_95_60d": "-0.0517607482209373",
+        "cvar_severity_abs": "0.0517607482209373",
+        "cvar_low_abs": "0.018403623953779272",
+        "defensive_alpha": "1.0",
+        "methodology": "CVaR_train_abs_ratio"
+      }
+    ],
+    "main_cost_metrics": [
+      {
+        "strategy": "Buy & Hold",
+        "total_return": "1.2193795418408309",
+        "mean_daily_return": "0.0005798019426643707",
+        "daily_volatility": "0.010286981826472882",
+        "VaR_95": "-0.01587682009181758",
+        "CVaR_95": "-0.023778266882971646",
+        "max_drawdown": "-0.2176465717142304",
+        "sharpe_ratio": "0.8947299271090626",
+        "return_cvar_ratio": "51.281262332624685",
+        "cost_rate": "0.0",
+        "total_transaction_cost": "0.0"
+      },
+      {
+        "strategy": "ML Hard gross",
+        "total_return": "0.8255680026476406",
+        "mean_daily_return": "0.0004377390348644167",
+        "daily_volatility": "0.008181462490672331",
+        "VaR_95": "-0.01326140425025292",
+        "CVaR_95": "-0.019199545611962486",
+        "max_drawdown": "-0.21700980678239534",
+        "sharpe_ratio": "0.8493459158802588",
+        "return_cvar_ratio": "42.99935109574997",
+        "cost_rate": "0.0",
+        "total_transaction_cost": "0.0"
+      },
+      {
+        "strategy": "ML Hard net of costs",
+        "total_return": "0.7636345786813961",
+        "mean_daily_return": "0.0004126376590418411",
+        "daily_volatility": "0.008183812153982284",
+        "VaR_95": "-0.013395345775727392",
+        "CVaR_95": "-0.019240625542890456",
+        "max_drawdown": "-0.22280629244980688",
+        "sharpe_ratio": "0.8004117935722633",
+        "return_cvar_ratio": "39.688656534535816",
+        "cost_rate": "0.001",
+        "total_transaction_cost": "0.03451439175604144"
+      },
+      {
+        "strategy": "ML Probability-Weighted gross",
+        "total_return": "0.7755465019024177",
+        "mean_daily_return": "0.000417533282861965",
+        "daily_volatility": "0.008117560553927566",
+        "VaR_95": "-0.01342901500126078",
+        "CVaR_95": "-0.019023716059572832",
+        "max_drawdown": "-0.21697894403544338",
+        "sharpe_ratio": "0.8165181324165115",
+        "return_cvar_ratio": "40.76735057828824",
+        "cost_rate": "0.0",
+        "total_transaction_cost": "0.0"
+      },
+      {
+        "strategy": "ML Probability-Weighted net of costs",
+        "total_return": "0.7058166893642768",
+        "mean_daily_return": "0.0003883956310892902",
+        "daily_volatility": "0.008118076020008637",
+        "VaR_95": "-0.013435429360814958",
+        "CVaR_95": "-0.019061570359494302",
+        "max_drawdown": "-0.2259280053612397",
+        "sharpe_ratio": "0.7594890077157631",
+        "return_cvar_ratio": "37.028255073051696",
+        "cost_rate": "0.001",
+        "total_transaction_cost": "0.04006427118742779"
+      }
+    ],
+    "main_turnover": [
+      {
+        "sample": "MAIN",
+        "strategy": "ML Hard Classification",
+        "cost_rate": "0.001",
+        "turnover_threshold": "0.01",
+        "total_turnover": "34.51439175604145",
+        "average_daily_turnover": "0.0251013758225756",
+        "annualized_turnover": "6.325546707289051",
+        "mean_abs_change": "0.0251013758225756",
+        "median_abs_change": "0.0",
+        "raw_changes": "86",
+        "effective_changes": "86",
+        "n_observations": "1375"
+      },
+      {
+        "sample": "MAIN",
+        "strategy": "ML Probability-Weighted",
+        "cost_rate": "0.001",
+        "turnover_threshold": "0.01",
+        "total_turnover": "40.06427118742779",
+        "average_daily_turnover": "0.029137651772674758",
+        "annualized_turnover": "7.342688246714039",
+        "mean_abs_change": "0.029137651772674758",
+        "median_abs_change": "0.00783339441511921",
+        "raw_changes": "1374",
+        "effective_changes": "626",
+        "n_observations": "1375"
+      }
+    ],
+    "main_classification_rounded": [
+      {
+        "Model": "Logistic Regression",
+        "Accuracy": "0.912",
+        "Balanced Accuracy": "0.779",
+        "Stress Recall": "0.545"
+      },
+      {
+        "Model": "Random Forest",
+        "Accuracy": "0.903",
+        "Balanced Accuracy": "0.765",
+        "Stress Recall": "0.515"
+      },
+      {
+        "Model": "XGBoost",
+        "Accuracy": "0.912",
+        "Balanced Accuracy": "0.78",
+        "Stress Recall": "0.515"
+      }
+    ],
+    "main_common_metrics": [
+      {
+        "Strategy": "Buy & Hold",
+        "Total Return": "1.2193795418408309",
+        "Daily Volatility": "0.010286981826472882",
+        "VaR 95%": "-0.01587682009181758",
+        "CVaR 95%": "-0.023778266882971646",
+        "Max Drawdown": "-0.2176465717142304",
+        "Sharpe": "0.8947299271090626"
+      },
+      {
+        "Strategy": "Regime-based",
+        "Total Return": "0.8579012213980923",
+        "Daily Volatility": "0.008148190456574679",
+        "VaR 95%": "-0.013330171713346078",
+        "CVaR 95%": "-0.018969309794756216",
+        "Max Drawdown": "-0.21018341701722265",
+        "Sharpe": "0.8776894691766307"
+      },
+      {
+        "Strategy": "ML hard classification",
+        "Total Return": "0.8255680026476406",
+        "Daily Volatility": "0.008181462490672331",
+        "VaR 95%": "-0.01326140425025292",
+        "CVaR 95%": "-0.019199545611962486",
+        "Max Drawdown": "-0.21700980678239534",
+        "Sharpe": "0.8493459158802588"
+      },
+      {
+        "Strategy": "ML probability-weighted",
+        "Total Return": "0.7755465019024177",
+        "Daily Volatility": "0.008117560553927566",
+        "VaR 95%": "-0.01342901500126078",
+        "CVaR 95%": "-0.019023716059572832",
+        "Max Drawdown": "-0.21697894403544338",
+        "Sharpe": "0.8165181324165115"
+      }
+    ],
+    "robust_mapping": [
+      {
+        "regime": "0",
+        "economic_label": "low_risk",
+        "risk_order": "1",
+        "target_exposure": "1.0",
+        "mean_cvar_95_60d": "-0.018436212415759167",
+        "cvar_severity_abs": "0.018436212415759167",
+        "cvar_low_abs": "0.018436212415759167",
+        "defensive_alpha": "1.0",
+        "methodology": "CVaR_train_abs_ratio"
+      },
+      {
+        "regime": "1",
+        "economic_label": "medium_risk",
+        "risk_order": "2",
+        "target_exposure": "0.6007078845462255",
+        "mean_cvar_95_60d": "-0.030690811441048214",
+        "cvar_severity_abs": "0.030690811441048214",
+        "cvar_low_abs": "0.018436212415759167",
+        "defensive_alpha": "1.0",
+        "methodology": "CVaR_train_abs_ratio"
+      },
+      {
+        "regime": "2",
+        "economic_label": "high_risk",
+        "risk_order": "3",
+        "target_exposure": "0.38855936256726015",
+        "mean_cvar_95_60d": "-0.04744760824690676",
+        "cvar_severity_abs": "0.04744760824690676",
+        "cvar_low_abs": "0.018436212415759167",
+        "defensive_alpha": "1.0",
+        "methodology": "CVaR_train_abs_ratio"
+      }
+    ],
+    "robust_cost_metrics": [
+      {
+        "strategy": "Buy & Hold",
+        "total_return": "0.854795985686492",
+        "mean_daily_return": "0.00037853842478497064",
+        "daily_volatility": "0.012724986674864972",
+        "VaR_95": "-0.017651343647535688",
+        "CVaR_95": "-0.03058080316625372",
+        "max_drawdown": "-0.39434324726316283",
+        "sharpe_ratio": "0.4722292726520856",
+        "return_cvar_ratio": "27.952044981924136",
+        "cost_rate": "0.0",
+        "total_transaction_cost": "0.0"
+      },
+      {
+        "strategy": "ML Hard gross",
+        "total_return": "0.6235158309277702",
+        "mean_daily_return": "0.00029693263702429163",
+        "daily_volatility": "0.008727615429488302",
+        "VaR_95": "-0.014358262102927285",
+        "CVaR_95": "-0.02079566992499575",
+        "max_drawdown": "-0.23348227585218728",
+        "sharpe_ratio": "0.5400856076108839",
+        "return_cvar_ratio": "29.982964394829306",
+        "cost_rate": "0.0",
+        "total_transaction_cost": "0.0"
+      },
+      {
+        "strategy": "ML Hard net of costs",
+        "total_return": "0.5496066492034604",
+        "mean_daily_return": "0.0002683830416773654",
+        "daily_volatility": "0.008730435353146696",
+        "VaR_95": "-0.014517346252315228",
+        "CVaR_95": "-0.02084605444210771",
+        "max_drawdown": "-0.24721719100087514",
+        "sharpe_ratio": "0.48799957092366153",
+        "return_cvar_ratio": "26.365020331775096",
+        "cost_rate": "0.001",
+        "total_transaction_cost": "0.04659293960618356"
+      },
+      {
+        "strategy": "ML Probability-Weighted gross",
+        "total_return": "0.5809100570278385",
+        "mean_daily_return": "0.00028063766340905385",
+        "daily_volatility": "0.008713033512376367",
+        "VaR_95": "-0.014525744648002645",
+        "CVaR_95": "-0.020767997520960424",
+        "max_drawdown": "-0.2535286637205105",
+        "sharpe_ratio": "0.5113012349904994",
+        "return_cvar_ratio": "27.971404389929553",
+        "cost_rate": "0.0",
+        "total_transaction_cost": "0.0"
+      },
+      {
+        "strategy": "ML Probability-Weighted net of costs",
+        "total_return": "0.5105501991725045",
+        "mean_daily_return": "0.00025274139385601",
+        "daily_volatility": "0.008714391530605629",
+        "VaR_95": "-0.014527636308470615",
+        "CVaR_95": "-0.020809308930882477",
+        "max_drawdown": "-0.269694668841464",
+        "sharpe_ratio": "0.4604045194478597",
+        "return_cvar_ratio": "24.534702275230877",
+        "cost_rate": "0.001",
+        "total_transaction_cost": "0.04552671191056746"
+      }
+    ],
+    "robust_turnover": [
+      {
+        "sample": "ROBUST",
+        "strategy": "ML Hard Classification",
+        "cost_rate": "0.001",
+        "turnover_threshold": "0.01",
+        "total_turnover": "46.59293960618356",
+        "average_daily_turnover": "0.028549595346926204",
+        "annualized_turnover": "7.194498027425404",
+        "mean_abs_change": "0.028549595346926204",
+        "median_abs_change": "0.0",
+        "raw_changes": "127",
+        "effective_changes": "127",
+        "n_observations": "1632"
+      },
+      {
+        "sample": "ROBUST",
+        "strategy": "ML Probability-Weighted",
+        "cost_rate": "0.001",
+        "turnover_threshold": "0.01",
+        "total_turnover": "45.52671191056746",
+        "average_daily_turnover": "0.027896269553043786",
+        "annualized_turnover": "7.029859927367034",
+        "mean_abs_change": "0.027896269553043786",
+        "median_abs_change": "0.007419924415916546",
+        "raw_changes": "1631",
+        "effective_changes": "716",
+        "n_observations": "1632"
+      }
+    ],
+    "robust_classification_rounded": [
+      {
+        "Model": "Logistic Regression",
+        "Accuracy": "0.889",
+        "Balanced Accuracy": "0.826",
+        "Stress Recall": "0.708"
+      },
+      {
+        "Model": "Random Forest",
+        "Accuracy": "0.899",
+        "Balanced Accuracy": "0.863",
+        "Stress Recall": "0.808"
+      },
+      {
+        "Model": "XGBoost",
+        "Accuracy": "0.885",
+        "Balanced Accuracy": "0.816",
+        "Stress Recall": "0.658"
+      }
+    ],
+    "robust_common_metrics": [
+      {
+        "Strategy": "Buy & Hold",
+        "Total Return": "0.854795985686492",
+        "Daily Volatility": "0.012724986674864972",
+        "VaR 95%": "-0.017651343647535688",
+        "CVaR 95%": "-0.03058080316625372",
+        "Max Drawdown": "-0.39434324726316283",
+        "Sharpe": "0.4722292726520856"
+      },
+      {
+        "Strategy": "Regime-based",
+        "Total Return": "0.6035932748945492",
+        "Daily Volatility": "0.008750466552560437",
+        "VaR 95%": "-0.014358262102927285",
+        "CVaR 95%": "-0.02073126489719936",
+        "Max Drawdown": "-0.26225938620496636",
+        "Sharpe": "0.5249501086858498"
+      },
+      {
+        "Strategy": "ML hard classification",
+        "Total Return": "0.6235158309277702",
+        "Daily Volatility": "0.008727615429488302",
+        "VaR 95%": "-0.014358262102927285",
+        "CVaR 95%": "-0.02079566992499575",
+        "Max Drawdown": "-0.23348227585218728",
+        "Sharpe": "0.5400856076108839"
+      },
+      {
+        "Strategy": "ML probability-weighted",
+        "Total Return": "0.5809100570278385",
+        "Daily Volatility": "0.008713033512376367",
+        "VaR 95%": "-0.014525744648002645",
+        "CVaR 95%": "-0.020767997520960424",
+        "Max Drawdown": "-0.2535286637205105",
+        "Sharpe": "0.5113012349904994"
+      }
+    ]
+  },
+  "classification_exact": {
+    "main": {
+      "accuracy": 0.9120639534883721,
+      "balanced_accuracy": 0.7803323085931781
+    },
+    "robust": {
+      "accuracy": 0.8848744641763625,
+      "balanced_accuracy": 0.8164092511375646
+    }
+  },
+  "classification_source": "notebook 05, stored output cell 20 (zero-based); not retrained"
+}

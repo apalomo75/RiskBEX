@@ -1,0 +1,128 @@
+{
+  "status": "complete",
+  "boundary_policy": "causal",
+  "versions": {
+    "python": "3.11.14",
+    "python_executable": "/home/apalo/miniconda3/envs/fin-forecasting/bin/python",
+    "pandas": "2.3.3",
+    "numpy": "2.3.4",
+    "scikit_learn": "1.7.2",
+    "xgboost": "3.0.5"
+  },
+  "samples": {
+    "main": {
+      "model_sha256": "4368859c76af72ba48dd74158251faf0011e6a81c2162f73e94c21d98343469e",
+      "train_rows": 5273,
+      "last_feature_date": "2020-12-30",
+      "trained_through": "2020-12-31",
+      "oos_rows": 1357,
+      "oos_end": "2026-04-23",
+      "classification_tfm": {
+        "accuracy": 0.9123065585851142,
+        "balanced_accuracy": 0.7802406327589281,
+        "stress_recall": 0.5151515151515151,
+        "n_observations": 1357,
+        "confusion_matrix": [
+          [
+            862,
+            0,
+            58
+          ],
+          [
+            1,
+            17,
+            15
+          ],
+          [
+            43,
+            2,
+            359
+          ]
+        ]
+      },
+      "classification_new": {
+        "accuracy": 0.9100957995578481,
+        "balanced_accuracy": 0.7870413128269349,
+        "stress_recall": 0.5454545454545454,
+        "n_observations": 1357,
+        "confusion_matrix": [
+          [
+            862,
+            0,
+            58
+          ],
+          [
+            1,
+            18,
+            14
+          ],
+          [
+            46,
+            3,
+            355
+          ]
+        ]
+      },
+      "classification_changes": 11,
+      "serialization_roundtrip_exact": true,
+      "daily_inference_without_labels": true
+    },
+    "robust": {
+      "model_sha256": "f53d36b69f3cb12f25424bd3d0f6e306e04be8719b0c52d5be0e129c739eb2fa",
+      "train_rows": 5016,
+      "last_feature_date": "2019-12-30",
+      "trained_through": "2019-12-31",
+      "oos_rows": 1614,
+      "oos_end": "2026-04-23",
+      "classification_tfm": {
+        "accuracy": 0.8847583643122676,
+        "balanced_accuracy": 0.8161011428521462,
+        "stress_recall": 0.6583333333333333,
+        "n_observations": 1614,
+        "confusion_matrix": [
+          [
+            894,
+            76,
+            0
+          ],
+          [
+            51,
+            455,
+            18
+          ],
+          [
+            1,
+            40,
+            79
+          ]
+        ]
+      },
+      "classification_new": {
+        "accuracy": 0.8853779429987608,
+        "balanced_accuracy": 0.8124539842431555,
+        "stress_recall": 0.6416666666666667,
+        "n_observations": 1614,
+        "confusion_matrix": [
+          [
+            894,
+            76,
+            0
+          ],
+          [
+            48,
+            458,
+            18
+          ],
+          [
+            1,
+            42,
+            77
+          ]
+        ]
+      },
+      "classification_changes": 7,
+      "serialization_roundtrip_exact": true,
+      "daily_inference_without_labels": true
+    }
+  }
+}

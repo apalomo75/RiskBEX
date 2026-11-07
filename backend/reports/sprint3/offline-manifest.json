@@ -1,0 +1,83 @@
+{
+  "calendar": {
+    "availability_policy": "Conservative eligibility threshold, including half days; delivery and completeness must still be checked. Not an exchange closing time.",
+    "available_after_local": "20:00",
+    "calendar_id": "bme-2026-reviewed-v1",
+    "holidays": [
+      "2026-01-01",
+      "2026-04-03",
+      "2026-04-06",
+      "2026-05-01",
+      "2026-12-25"
+    ],
+    "reviewed_on": "2026-11-07",
+    "source": "https://www.bolsasymercados.es/dam/descargas/regulacion/renta-variable/sociedad-de-bolsas/instrucciones-operativas/2025/2025-65-oi-trading-sessions-calendar-2026-eng.pdf",
+    "timezone": "Europe/Madrid",
+    "years": [
+      2026
+    ]
+  },
+  "calendar_sha256": "7d855f22f0a2cb88c54980b2980dc10ed91e53c980e02591afed907b2dc747c3",
+  "cost_rate": 0.001,
+  "data_date": "2026-04-23",
+  "downloaded_at": "2026-04-23T20:00:00+00:00",
+  "engine": "MAIN",
+  "files": {
+    "backtest.csv": "520791fb15b433926ff8d1b775d93ef4cb189e99d86a3347aee9a161d38f5396",
+    "features.csv": "0ddb6f794c9fa876a3a4c4e63f8bb80a9e65f99087b25b7563b1f765e1e79953",
+    "latest.json": "18d21e189e715aa73fcbce726e397a81678eb724e4e6f6dec994cfb61b92145b",
+    "metrics.csv": "cf24215436796ca1e335ec873d7b36eb9e2f5d698931f5d9687aed673fff3b4d",
+    "prices.csv": "148532f5d480814cd769fe17fb7b8f86fe682b19409f8d5e17800fb7576acb77",
+    "signals.csv": "6a49a9b125f939a109e3ff8b5fbfd7e6f195ff4dfc985dec6f7582fce3a70288",
+    "turnover.csv": "a163b749059d298f142b538f6064e7699e7c9085b19d53d235bfc50d7c7d6e92"
+  },
+  "generated_at": "2026-04-23T20:00:00+00:00",
+  "implementation_sha256": {
+    "backtesting/costs.py": "16363467767b15fff9a4ad554f3fad372d82467d59dae31dbb5b28a1eae06439",
+    "backtesting/exposures.py": "09a2ce1a74ea23ec5abc6a47a361983d603b2e8dfd460c71421da327948c65b2",
+    "backtesting/metrics.py": "e37cf74e8a7be773ef2bde0c74361dd8bcbef0f70d8e9e768d0424fe2e619596",
+    "backtesting/ml_backtest.py": "a50e6ac2462a5486cc8649ad0a345455fc84c0bfa0d8b16235a43125ca71df7d",
+    "engine/package.py": "5dabd4c9757de121e78f43672e90494c5deff5cea9030a9d35f0a3b1f48fbfb4",
+    "engine/service.py": "2e9854bb9553ca3c9ad66ac8f92c5a088cbf60aed24a9eb90fd8b6624c2b1a48",
+    "features/downside.py": "60acedef2bee1fa2f278a3eb73f72da45cbfb8163b2fc0e1815e5e3937fa762e",
+    "features/drawdown.py": "f98799b0f8b41028215224de85fe78e4ba2cb2af4c75e50e7e2b5b3a10571fea",
+    "features/market.py": "445e2fd749b89ca90ba79f21675d309e4a5f1d7a718946962e91eb861a5bc857",
+    "features/returns.py": "7165f477ac23b8bad923c6223558853c296b8a2caa2a68bfdc68d9f1556baa03",
+    "features/tail_risk.py": "ffbed2641e5d04415ce2193616d370c8227279f851acae376f074949c0b6b4a8",
+    "features/volatility.py": "8db94262d84676ee67bbee6415f5452c4c78e64804d91412da2a65ae707c3618",
+    "ml/config.py": "b9ae0ada4649f08dcc2cf299854405c2e06803b7c8d05ade381a9df58d77fa3b",
+    "ml/data.py": "6a61ea035b9f5f8c68bf889d6946f6cb351321ba6ad03d6e612325b51a0703f0",
+    "ml/inference.py": "9a2764a0e52c080589193f2a95f1009263e90f55f891da935de8c78ff947120a",
+    "pipeline/__init__.py": "9f0d301b1784cd69693e274cf4ac4ab71535f6e1d38d1d3f75011a9106b49eb0",
+    "pipeline/calendar.py": "56b54d527703cf36d2baf03d6e193d3e82a77d59e3b17213a579cee1c662bbf3",
+    "pipeline/history.py": "eca0d49962ab99b6c9d94bbcb8829414d80b6629ff850e50824e397a6b95a52c",
+    "pipeline/loaders.py": "ee13c820898d1e073f1a327eaeb002430389628c4cde1c9669cb00dae80365fd",
+    "pipeline/provider.py": "d4574eb1120e3a7e06f1c219a13792bd87ecc6c250825002400ca048a2b794ec",
+    "pipeline/service.py": "6e0bb8ff9aac85eec0fba437894f89933d0d0748a2279acd44923e794f4e1bf2",
+    "pipeline/store.py": "00b9b9bcdd4590972c11db695a4edc4ebda49cfbf06bef416f4c55d07c3c201e",
+    "regimes/persistence.py": "00ce10de778f58d7bd2e41d9432ece824f0bedc9d2d2f36b63e04dab634049c3"
+  },
+  "last_signal_date": "2026-04-23",
+  "model_hashes": {
+    "markov/cvar_mapping.json": "c6a5d042a4101029cd5b35a33d90dee4522b0034d77ba017ddf5499548a0d2f2",
+    "markov/metadata.json": "5a510967585e8662e525882163854587702d3f35cef12a19338fb9fe755fce50",
+    "markov/parameters.json": "1884f3ed40c6aaae9a79022487659e045905b4802b507a6f8c3ce88d19e2e7d3",
+    "markov/validation.json": "a0f13a8d509c391d51649aa49bbb18a2617b81242cbe7210b80c379e746bab6a",
+    "xgboost/metadata.json": "9067b6f7b7e7601432a4269479493fefdff2258dda861de43f01536b8762d07a",
+    "xgboost/model.ubj": "4368859c76af72ba48dd74158251faf0011e6a81c2162f73e94c21d98343469e",
+    "xgboost/validation.json": "88172d08547b6102a9eb336d28af9b809d3078305d8f18955a6166d8b2b194bf"
+  },
+  "model_manifest_sha256": "1e63e51d70278a60188db1351f5f5e081f8cfa011d82ce0012317ac4f676a68c",
+  "new_sessions": 1,
+  "package_id": "riskbex-main-v1",
+  "previous_version": null,
+  "price_sha256": "d8f512174b96b911a2fe25255b2d034d69b083f9722bfce2bf1bc9c3baf8b51f",
+  "provenance": "frozen MAIN parameters; causal-v1 predictions; training-only CVaR; no fit",
+  "regression_receipt_sha256": "9cbd7e516a9fb5f7726b4f231bc84f9241b3407189486b08fa6e35fd2b270281",
+  "return_convention": "log; target(t-1) times return(t); first OOS dropped",
+  "schema_version": 1,
+  "source": "local-simulated-provider:/tmp/riskbex-sprint3-inputs/response.csv",
+  "status": "validated",
+  "target_session_date": "2026-04-24",
+  "version": "2229f6b226347593a5a54c224447f2820252ae4a362fd26e4b9ee9d21d79acd9"
+}

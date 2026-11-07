@@ -1,199 +1,57 @@
+"""Single MAIN update entrypoint. Explicit inputs and fetch consent; no import side effects."""
+import argparse
+import json
 from pathlib import Path
 import sys
-
-import numpy as np
 import pandas as pd
-import yfinance as yf
+BACKEND = Path(__file__).resolve().parents[1]
+if str(BACKEND) not in sys.path:
+    sys.path.insert(0, str(BACKEND))
+from src.riskbex.engine.package import load_main_package
+from src.riskbex.pipeline.calendar import SessionCalendar
+from src.riskbex.pipeline.provider import YahooProvider
+from src.riskbex.pipeline.service import update_main
+from src.riskbex.pipeline.store import VersionStore
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.riskbex.config import (
-    EWMA_LAMBDA,
-    MAIN_TEST_START,
-    ROBUST_TEST_START,
-    ROLLING_LONG_WINDOW,
-    ROLLING_SHORT_WINDOW,
-    START_DATE,
-    TICKER,
-)
-from src.riskbex.features.downside import compute_downside_volatility
-from src.riskbex.features.drawdown import compute_drawdown
-from src.riskbex.features.returns import (
-    compute_log_returns,
-    compute_risk_adjusted_return,
-    compute_rolling_return,
-)
-from src.riskbex.features.scoring import compute_risk_score
-from src.riskbex.features.tail_risk import (
-    compute_historical_cvar,
-    compute_historical_var,
-)
-from src.riskbex.features.volatility import compute_ewma_volatility
-from src.riskbex.paths import (
-    CAP4_INPUT_PATH,
-    CHAPTER2_FIGURES_DIR,
-    MASTER_DATASET_PATH,
-    PROCESSED_DATA_DIR,
-    RAW_DATA_DIR,
-    RAW_PRICES_PATH,
-)
-from src.riskbex.reporting.figures import generate_chapter2_figures
+class FileProvider:
+    def __init__(self, path):
+        self.path = path
+        self.source = 'local-simulated-provider:' + str(path)
 
-# =========================
-# PATHS
-# =========================
-FIGURES_DIR = CHAPTER2_FIGURES_DIR
+    def fetch(self, start, end):
+        frame = pd.read_csv(self.path, float_precision='round_trip')
+        dates = pd.to_datetime(frame.date)
+        return frame.loc[dates.between(start, end), ['date', 'ibex_close']].copy()
 
-RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
-PROCESSED_DATA_DIR.mkdir(parents=True, exist_ok=True)
-FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
-RAW_OUTPUT = RAW_PRICES_PATH
-PROCESSED_OUTPUT = MASTER_DATASET_PATH
-CAP4_OUTPUT = CAP4_INPUT_PATH
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--seed', type=Path, required=True, help='Validated complete local price history; never overwritten')
+    parser.add_argument('--store', type=Path, required=True, help='Separate versioned operational directory')
+    parser.add_argument('--regression-receipt', type=Path, required=True)
+    parser.add_argument('--calendar', type=Path, default=BACKEND / 'config/bme-2026.json')
+    parser.add_argument('--package', type=Path, default=BACKEND / 'model_packages/main-v1')
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('--fetch', action='store_true', help='Explicitly allow one real Yahoo request')
+    group.add_argument('--provider-file', type=Path, help='Offline provider response; never contacts network')
+    parser.add_argument('--now', help='Timezone-aware simulated generation time; offline only')
+    args = parser.parse_args()
+    if args.fetch and args.now:
+        parser.error('--now is simulation-only and cannot be used for a real download')
+    # Guard accidental use of the immutable source directories as the output store.
+    destination = args.store.resolve()
+    for forbidden in [BACKEND / 'data', BACKEND / 'tests', BACKEND / 'model_packages',
+                      BACKEND / 'experiments', BACKEND.parent.parent / 'TMF-Market-Regimes-Risk-Portfolio']:
+        if destination == forbidden.resolve() or forbidden.resolve() in destination.parents:
+            parser.error('Store must be separate from academic, model, fixture and legacy data directories')
+    package = load_main_package(args.package)
+    provider = YahooProvider() if args.fetch else FileProvider(args.provider_file)
+    result = update_main(package, pd.read_csv(args.seed, float_precision='round_trip'), provider,
+                         SessionCalendar.load(args.calendar), VersionStore(args.store),
+                         now=args.now or pd.Timestamp.now(tz='UTC'), regression_receipt=args.regression_receipt)
+    print(json.dumps(result, indent=2))
 
-# =========================
-# PARAMETERS
-# =========================
-SHORT_WINDOW = ROLLING_SHORT_WINDOW
-MEDIUM_WINDOW = ROLLING_LONG_WINDOW
-VAR_TAIL_PROB = 0.05
 
-# =========================
-# STEP 1: DOWNLOAD IBEX
-# =========================
-print("Downloading IBEX data...")
-
-ibex = yf.download(
-    TICKER,
-    start=START_DATE,
-    progress=False,
-    auto_adjust=True
-)
-
-if ibex.empty:
-    raise ValueError("Downloaded dataset is empty.")
-
-ibex = ibex.reset_index()
-
-if "Date" not in ibex.columns:
-    raise ValueError("Column 'Date' not found in downloaded dataset.")
-
-if "Close" not in ibex.columns:
-    raise ValueError("Column 'Close' not found in downloaded dataset.")
-
-ibex = ibex[["Date", "Close"]].copy()
-ibex.columns = ["date", "ibex_close"]
-
-ibex["date"] = pd.to_datetime(ibex["date"])
-ibex = ibex.sort_values("date").reset_index(drop=True)
-
-# daily log returns
-ibex["ret_1d"] = compute_log_returns(ibex["ibex_close"])
-ibex = ibex.dropna(subset=["ret_1d"]).reset_index(drop=True)
-
-ibex.to_csv(RAW_OUTPUT, index=False)
-
-print(f"Raw data exported to: {RAW_OUTPUT}")
-print(f"Raw shape: {ibex.shape}")
-
-# =========================
-# STEP 2: FEATURE ENGINEERING
-# =========================
-print("Computing risk features...")
-
-df = ibex.set_index("date").copy()
-
-# performance features
-df["ret_20d"] = compute_rolling_return(df["ret_1d"], SHORT_WINDOW)
-df["ret_60d"] = compute_rolling_return(df["ret_1d"], MEDIUM_WINDOW)
-
-# volatility features
-df["vol_20d"] = df["ret_1d"].rolling(
-    window=SHORT_WINDOW,
-    min_periods=SHORT_WINDOW
-).std(ddof=1)
-
-df["vol_60d"] = df["ret_1d"].rolling(
-    window=MEDIUM_WINDOW,
-    min_periods=MEDIUM_WINDOW
-).std(ddof=1)
-
-# downside risk
-df["downside_vol_20d"] = compute_downside_volatility(df["ret_1d"], SHORT_WINDOW)
-df["downside_vol_60d"] = compute_downside_volatility(df["ret_1d"], MEDIUM_WINDOW)
-
-# tail risk
-df["var_95_60d"] = compute_historical_var(df["ret_1d"], MEDIUM_WINDOW, VAR_TAIL_PROB)
-df["cvar_95_60d"] = compute_historical_cvar(df["ret_1d"], MEDIUM_WINDOW, VAR_TAIL_PROB)
-
-# EWMA volatility (daily scale)
-df["ewma_vol"] = compute_ewma_volatility(df["ret_1d"], EWMA_LAMBDA)
-
-# drawdown
-df["drawdown"] = compute_drawdown(df["ibex_close"])
-
-# skewness
-df["skew_60d"] = df["ret_1d"].rolling(
-    window=MEDIUM_WINDOW,
-    min_periods=MEDIUM_WINDOW
-).skew()
-
-feature_columns = [
-    "ibex_close",
-    "ret_1d",
-    "ret_20d",
-    "ret_60d",
-    "vol_20d",
-    "vol_60d",
-    "ewma_vol",
-    "downside_vol_20d",
-    "downside_vol_60d",
-    "var_95_60d",
-    "cvar_95_60d",
-    "drawdown",
-    "skew_60d",
-]
-
-master_base_df = df[feature_columns].copy()
-master_base_df = master_base_df.dropna(subset=feature_columns)
-master_base_df = master_base_df.reset_index()
-master_base_df = master_base_df.sort_values("date").reset_index(drop=True)
-
-master_base_df["sample_split_main"] = pd.Categorical(
-    np.where(master_base_df["date"] < pd.Timestamp(MAIN_TEST_START), "train", "test")
-)
-
-master_base_df["sample_split_robust"] = pd.Categorical(
-    np.where(master_base_df["date"] < pd.Timestamp(ROBUST_TEST_START), "train", "test")
-)
-
-master_base_df["ret_risk_20d"] = compute_risk_adjusted_return(
-    master_base_df["ret_20d"],
-    master_base_df["vol_20d"],
-)
-master_base_df["ret_risk_60d"] = compute_risk_adjusted_return(
-    master_base_df["ret_60d"],
-    master_base_df["vol_60d"],
-)
-
-master_base_df.to_csv(CAP4_OUTPUT, index=False)
-print(f"Cap4 input exported to: {CAP4_OUTPUT}")
-
-master_df = compute_risk_score(master_base_df)
-master_df.to_csv(PROCESSED_OUTPUT, index=False)
-
-print(f"Processed data exported to: {PROCESSED_OUTPUT}")
-print(f"Processed shape: {master_df.shape}")
-print(f"Date coverage: {master_df['date'].min()} to {master_df['date'].max()}")
-
-# =========================
-# STEP 3: GENERATE FIGURES
-# =========================
-print("Generating figures...")
-generate_chapter2_figures(master_df, FIGURES_DIR)
-
-print("Figures generated successfully.")
-print("Daily update completed successfully.")
+if __name__ == '__main__':
+    main()

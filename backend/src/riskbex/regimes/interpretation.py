@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 
 
@@ -37,7 +38,11 @@ def build_regime_label_mapping(summary_df):
     working_df["vol_rank"] = working_df["mean_ewma_vol"].rank(method="first")
     working_df["cvar_rank"] = working_df["mean_cvar_95_60d"].abs().rank(method="first")
     working_df["risk_severity"] = working_df["vol_rank"] + working_df["cvar_rank"]
-    working_df = working_df.sort_values(["risk_severity", "regime"]).reset_index(drop=True)
+    # TFM notebook 03: order by train EWMA, then signed train CVaR.
+    # Keep risk_severity as an informational field for the existing API schema.
+    working_df = working_df.sort_values(
+        ["mean_ewma_vol", "mean_cvar_95_60d", "regime"], kind="stable"
+    ).reset_index(drop=True)
     working_df["economic_label"] = ECONOMIC_LABELS[: len(working_df)]
     working_df["risk_order"] = range(1, len(working_df) + 1)
     return working_df[["regime", "economic_label", "risk_order", "risk_severity"]]
@@ -45,11 +50,24 @@ def build_regime_label_mapping(summary_df):
 
 def build_regime_summary(regime_dataset_df):
     summaries = []
-    for split_name, regime_column in [
-        ("MAIN", "main_regime"),
-        ("ROBUST", "robust_regime"),
+    for split_name, regime_column, split_column in [
+        ("MAIN", "main_regime", "sample_split_main"),
+        ("ROBUST", "robust_regime", "sample_split_robust"),
     ]:
-        summary_df = summarize_regimes(regime_dataset_df, regime_column, split_name)
+        required = [split_column, regime_column, "ret_1d", "ewma_vol", "cvar_95_60d"]
+        missing = [column for column in required if column not in regime_dataset_df]
+        if missing:
+            raise ValueError(f"Missing {split_name} interpretation columns: {missing}")
+        train_df = regime_dataset_df.loc[
+            regime_dataset_df[split_column] == "train"
+        ].copy()
+        if train_df.empty:
+            raise ValueError(f"No training rows for {split_name} interpretation.")
+        if set(train_df[regime_column].unique()) != {0, 1, 2}:
+            raise ValueError(f"{split_name} training data must contain regimes 0, 1 and 2.")
+        if not np.isfinite(train_df[["ret_1d", "ewma_vol", "cvar_95_60d"]].to_numpy(dtype=float)).all():
+            raise ValueError(f"{split_name} training risk variables must be finite.")
+        summary_df = summarize_regimes(train_df, regime_column, split_name)
         mapping_df = build_regime_label_mapping(summary_df)
         summaries.append(summary_df.merge(mapping_df, on="regime", how="left"))
     return pd.concat(summaries, ignore_index=True)

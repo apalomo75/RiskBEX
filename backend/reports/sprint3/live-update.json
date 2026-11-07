@@ -1,0 +1,11 @@
+{
+  "error": "Yahoo returned no prices; provider failure or unavailable data.",
+  "error_type": "RuntimeError",
+  "generated_at": "2026-11-07T19:22:32.533950+00:00",
+  "source": "yahoo-finance:^IBEX:1d:auto_adjust=True",
+  "status": "failed",
+  "real_prices_downloaded": false,
+  "publication_created": false,
+  "underlying_error": "DNS: Could not resolve host guce.yahoo.com",
+  "evidence": "live-download.log"
+}

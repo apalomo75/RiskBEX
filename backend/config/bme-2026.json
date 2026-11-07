@@ -1,0 +1,10 @@
+{
+  "calendar_id": "bme-2026-reviewed-v1",
+  "years": [2026],
+  "timezone": "Europe/Madrid",
+  "holidays": ["2026-01-01", "2026-04-03", "2026-04-06", "2026-05-01", "2026-12-25"],
+  "available_after_local": "20:00",
+  "availability_policy": "Conservative eligibility threshold, including half days; delivery and completeness must still be checked. Not an exchange closing time.",
+  "source": "https://www.bolsasymercados.es/dam/descargas/regulacion/renta-variable/sociedad-de-bolsas/instrucciones-operativas/2025/2025-65-oi-trading-sessions-calendar-2026-eng.pdf",
+  "reviewed_on": "2026-11-07"
+}

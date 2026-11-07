@@ -1,0 +1,8 @@
+{
+  "python": "3.11.14",
+  "python_executable": "/home/apalo/miniconda3/envs/fin-forecasting/bin/python",
+  "pandas": "2.3.3",
+  "numpy": "2.3.4",
+  "scikit_learn": "1.7.2",
+  "xgboost": "3.0.5"
+}

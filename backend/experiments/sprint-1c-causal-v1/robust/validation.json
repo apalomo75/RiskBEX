@@ -1,0 +1,562 @@
+{
+  "classification_tfm": {
+    "accuracy": 0.8847583643122676,
+    "balanced_accuracy": 0.8161011428521462,
+    "stress_recall": 0.6583333333333333,
+    "n_observations": 1614,
+    "confusion_matrix": [
+      [
+        894,
+        76,
+        0
+      ],
+      [
+        51,
+        455,
+        18
+      ],
+      [
+        1,
+        40,
+        79
+      ]
+    ]
+  },
+  "classification_new": {
+    "accuracy": 0.8853779429987608,
+    "balanced_accuracy": 0.8124539842431555,
+    "stress_recall": 0.6416666666666667,
+    "n_observations": 1614,
+    "confusion_matrix": [
+      [
+        894,
+        76,
+        0
+      ],
+      [
+        48,
+        458,
+        18
+      ],
+      [
+        1,
+        42,
+        77
+      ]
+    ]
+  },
+  "classification_changes": 7,
+  "classification_change_share": 0.004337050805452293,
+  "probability_differences": {
+    "0": {
+      "max_abs": 0.1453860134574127,
+      "mean_abs": 0.0065472184371261535,
+      "rmse": 0.012956334094252607
+    },
+    "1": {
+      "max_abs": 0.14527201178436278,
+      "mean_abs": 0.00837216697420401,
+      "rmse": 0.01554038768592524
+    },
+    "2": {
+      "max_abs": 0.07597083084869383,
+      "mean_abs": 0.0020044020420754145,
+      "rmse": 0.008680635765475092
+    }
+  },
+  "exposure_differences": {
+    "hard": {
+      "max_abs": 0.3992921154537745,
+      "mean_abs": 0.0015007796783799152,
+      "changed_sessions": 7
+    },
+    "proba": {
+      "max_abs": 0.05807565612310184,
+      "mean_abs": 0.0029895602885631318,
+      "changed_sessions": 1613
+    }
+  },
+  "metric_differences": [
+    {
+      "strategy": "Buy & Hold",
+      "metric": "total_return",
+      "tfm": 0.8455815616393874,
+      "new": 0.8455815616393874,
+      "delta": 0.0
+    },
+    {
+      "strategy": "Buy & Hold",
+      "metric": "daily_volatility",
+      "tfm": 0.012730156908120011,
+      "new": 0.012730156908120011,
+      "delta": 0.0
+    },
+    {
+      "strategy": "Buy & Hold",
+      "metric": "VaR_95",
+      "tfm": -0.01764151105248878,
+      "new": -0.01764151105248878,
+      "delta": 0.0
+    },
+    {
+      "strategy": "Buy & Hold",
+      "metric": "CVaR_95",
+      "tfm": -0.03065974562059564,
+      "new": -0.03065974562059564,
+      "delta": 0.0
+    },
+    {
+      "strategy": "Buy & Hold",
+      "metric": "max_drawdown",
+      "tfm": -0.39434324726316283,
+      "new": -0.39434324726316283,
+      "delta": 0.0
+    },
+    {
+      "strategy": "Buy & Hold",
+      "metric": "sharpe_ratio",
+      "tfm": 0.4737475321856651,
+      "new": 0.4737475321856651,
+      "delta": 0.0
+    },
+    {
+      "strategy": "Buy & Hold",
+      "metric": "total_transaction_cost",
+      "tfm": 0.0,
+      "new": 0.0,
+      "delta": 0.0
+    },
+    {
+      "strategy": "ML Hard gross",
+      "metric": "total_return",
+      "tfm": 0.6392492830578664,
+      "new": 0.6510467019121657,
+      "delta": 0.011797418854299302
+    },
+    {
+      "strategy": "ML Hard gross",
+      "metric": "daily_volatility",
+      "tfm": 0.008727481893143683,
+      "new": 0.008733949920525317,
+      "delta": 6.4680273816342115e-06
+    },
+    {
+      "strategy": "ML Hard gross",
+      "metric": "VaR_95",
+      "tfm": -0.014357486406949357,
+      "new": -0.01441193361144234,
+      "delta": -5.4447204492982446e-05
+    },
+    {
+      "strategy": "ML Hard gross",
+      "metric": "CVaR_95",
+      "tfm": -0.02075380826524808,
+      "new": -0.020848120545710738,
+      "delta": -9.431228046265921e-05
+    },
+    {
+      "strategy": "ML Hard gross",
+      "metric": "max_drawdown",
+      "tfm": -0.2334822758521875,
+      "new": -0.23315054787394895,
+      "delta": 0.0003317279782385496
+    },
+    {
+      "strategy": "ML Hard gross",
+      "metric": "sharpe_ratio",
+      "tfm": 0.5573312775600919,
+      "new": 0.5649990554365604,
+      "delta": 0.00766777787646844
+    },
+    {
+      "strategy": "ML Hard gross",
+      "metric": "total_transaction_cost",
+      "tfm": 0.0,
+      "new": 0.0,
+      "delta": 0.0
+    },
+    {
+      "strategy": "ML Hard net of costs",
+      "metric": "total_return",
+      "tfm": 0.567124813830616,
+      "new": 0.5821891612181784,
+      "delta": 0.01506434738756246
+    },
+    {
+      "strategy": "ML Hard net of costs",
+      "metric": "daily_volatility",
+      "tfm": 0.008729850073500214,
+      "new": 0.008736881051248686,
+      "delta": 7.030977748472347e-06
+    },
+    {
+      "strategy": "ML Hard net of costs",
+      "metric": "VaR_95",
+      "tfm": -0.01451315687878895,
+      "new": -0.014581561668773571,
+      "delta": -6.840478998462046e-05
+    },
+    {
+      "strategy": "ML Hard net of costs",
+      "metric": "CVaR_95",
+      "tfm": -0.02079988528114595,
+      "new": -0.02089438909147971,
+      "delta": -9.450381033375768e-05
+    },
+    {
+      "strategy": "ML Hard net of costs",
+      "metric": "max_drawdown",
+      "tfm": -0.24721719100087436,
+      "new": -0.24819638640685393,
+      "delta": -0.0009791954059795716
+    },
+    {
+      "strategy": "ML Hard net of costs",
+      "metric": "sharpe_ratio",
+      "tfm": 0.5064540648175606,
+      "new": 0.5168229830096686,
+      "delta": 0.010368918192107945
+    },
+    {
+      "strategy": "ML Hard net of costs",
+      "metric": "total_transaction_cost",
+      "tfm": 0.044995771144368465,
+      "new": 0.04260001845164582,
+      "delta": -0.002395752692722644
+    },
+    {
+      "strategy": "ML Probability-Weighted gross",
+      "metric": "total_return",
+      "tfm": 0.5853844008152336,
+      "new": 0.5885970869510726,
+      "delta": 0.003212686135839027
+    },
+    {
+      "strategy": "ML Probability-Weighted gross",
+      "metric": "daily_volatility",
+      "tfm": 0.008713839352033534,
+      "new": 0.008712880479041805,
+      "delta": -9.588729917280742e-07
+    },
+    {
+      "strategy": "ML Probability-Weighted gross",
+      "metric": "VaR_95",
+      "tfm": -0.01452573140514818,
+      "new": -0.014553716873924007,
+      "delta": -2.7985468775826652e-05
+    },
+    {
+      "strategy": "ML Probability-Weighted gross",
+      "metric": "CVaR_95",
+      "tfm": -0.0207639882700293,
+      "new": -0.020764250901436892,
+      "delta": -2.6263140759028025e-07
+    },
+    {
+      "strategy": "ML Probability-Weighted gross",
+      "metric": "max_drawdown",
+      "tfm": -0.2535286637205102,
+      "new": -0.25264527913171697,
+      "delta": 0.0008833845887932235
+    },
+    {
+      "strategy": "ML Probability-Weighted gross",
+      "metric": "sharpe_ratio",
+      "tfm": 0.5204681742808547,
+      "new": 0.5228120951540929,
+      "delta": 0.0023439208732382033
+    },
+    {
+      "strategy": "ML Probability-Weighted gross",
+      "metric": "total_transaction_cost",
+      "tfm": 0.0,
+      "new": 0.0,
+      "delta": 0.0
+    },
+    {
+      "strategy": "ML Probability-Weighted net of costs",
+      "metric": "total_return",
+      "tfm": 0.5162132434832558,
+      "new": 0.5200828118437331,
+      "delta": 0.003869568360477249
+    },
+    {
+      "strategy": "ML Probability-Weighted net of costs",
+      "metric": "daily_volatility",
+      "tfm": 0.008715279109293412,
+      "new": 0.008714526860094012,
+      "delta": -7.522491994003955e-07
+    },
+    {
+      "strategy": "ML Probability-Weighted net of costs",
+      "metric": "VaR_95",
+      "tfm": -0.014527592385660607,
+      "new": -0.01455513776423106,
+      "delta": -2.754537857045311e-05
+    },
+    {
+      "strategy": "ML Probability-Weighted net of costs",
+      "metric": "CVaR_95",
+      "tfm": -0.020804898075585766,
+      "new": -0.020806598120595203,
+      "delta": -1.700045009437462e-06
+    },
+    {
+      "strategy": "ML Probability-Weighted net of costs",
+      "metric": "max_drawdown",
+      "tfm": -0.2696946688414641,
+      "new": -0.2687790451554467,
+      "delta": 0.0009156236860173861
+    },
+    {
+      "strategy": "ML Probability-Weighted net of costs",
+      "metric": "sharpe_ratio",
+      "tfm": 0.47000590110969825,
+      "new": 0.4729250024196488,
+      "delta": 0.0029191013099505447
+    },
+    {
+      "strategy": "ML Probability-Weighted net of costs",
+      "metric": "total_transaction_cost",
+      "tfm": 0.04461096284217292,
+      "new": 0.04408647664410819,
+      "delta": -0.0005244861980647289
+    }
+  ],
+  "common_gross_metrics_tfm": [
+    {
+      "sample": "ROBUST",
+      "strategy": "Buy & Hold",
+      "total_return": 0.8455815616393874,
+      "mean_daily_return": 0.0003799097565933274,
+      "daily_volatility": 0.012730156908120011,
+      "annualized_volatility": 0.20208497597829886,
+      "VaR_95": -0.01764151105248878,
+      "CVaR_95": -0.03065974562059564,
+      "max_drawdown": -0.39434324726316283,
+      "n_observations": 1613,
+      "start_date": "2020-01-03",
+      "end_date": "2026-04-23",
+      "sharpe_ratio": 0.4737475321856651,
+      "return_cvar_ratio": 27.579536115634607,
+      "cost_rate": 0.0,
+      "total_transaction_cost": 0.0
+    },
+    {
+      "sample": "ROBUST",
+      "strategy": "Regime-based",
+      "total_return": 0.5988029923033258,
+      "mean_daily_return": 0.0002909207808100145,
+      "daily_volatility": 0.008765375915872169,
+      "annualized_volatility": 0.13914602892835667,
+      "VaR_95": -0.01435748640694932,
+      "CVaR_95": -0.02080783607070693,
+      "max_drawdown": -0.26225938620496636,
+      "n_observations": 1613,
+      "start_date": "2020-01-03",
+      "end_date": "2026-04-23",
+      "sharpe_ratio": 0.5268712109769979,
+      "return_cvar_ratio": 28.77776383226677,
+      "cost_rate": 0.0,
+      "total_transaction_cost": 0.0
+    },
+    {
+      "sample": "ROBUST",
+      "strategy": "ML Hard",
+      "total_return": 0.6392492830578664,
+      "mean_daily_return": 0.00030640941277225426,
+      "daily_volatility": 0.008727481893143683,
+      "annualized_volatility": 0.13854447996646424,
+      "VaR_95": -0.014357486406949357,
+      "CVaR_95": -0.02075380826524808,
+      "max_drawdown": -0.2334822758521875,
+      "n_observations": 1613,
+      "start_date": "2020-01-03",
+      "end_date": "2026-04-23",
+      "sharpe_ratio": 0.5573312775600919,
+      "return_cvar_ratio": 30.801541331008593,
+      "cost_rate": 0.0,
+      "total_transaction_cost": 0.0
+    },
+    {
+      "sample": "ROBUST",
+      "strategy": "ML Probability-weighted",
+      "total_return": 0.5853844008152336,
+      "mean_daily_return": 0.000285695537568915,
+      "daily_volatility": 0.008713839352033534,
+      "annualized_volatility": 0.13832791134029368,
+      "VaR_95": -0.01452573140514818,
+      "CVaR_95": -0.0207639882700293,
+      "max_drawdown": -0.2535286637205102,
+      "n_observations": 1613,
+      "start_date": "2020-01-03",
+      "end_date": "2026-04-23",
+      "sharpe_ratio": 0.5204681742808547,
+      "return_cvar_ratio": 28.192291057117203,
+      "cost_rate": 0.0,
+      "total_transaction_cost": 0.0
+    }
+  ],
+  "common_gross_metrics_new": [
+    {
+      "sample": "ROBUST",
+      "strategy": "Buy & Hold",
+      "total_return": 0.8455815616393874,
+      "mean_daily_return": 0.0003799097565933274,
+      "daily_volatility": 0.012730156908120011,
+      "annualized_volatility": 0.20208497597829886,
+      "VaR_95": -0.01764151105248878,
+      "CVaR_95": -0.03065974562059564,
+      "max_drawdown": -0.39434324726316283,
+      "n_observations": 1613,
+      "start_date": "2020-01-03",
+      "end_date": "2026-04-23",
+      "sharpe_ratio": 0.4737475321856651,
+      "return_cvar_ratio": 27.579536115634607,
+      "cost_rate": 0.0,
+      "total_transaction_cost": 0.0
+    },
+    {
+      "sample": "ROBUST",
+      "strategy": "Regime-based",
+      "total_return": 0.5988029923033258,
+      "mean_daily_return": 0.0002909207808100145,
+      "daily_volatility": 0.008765375915872169,
+      "annualized_volatility": 0.13914602892835667,
+      "VaR_95": -0.01435748640694932,
+      "CVaR_95": -0.02080783607070693,
+      "max_drawdown": -0.26225938620496636,
+      "n_observations": 1613,
+      "start_date": "2020-01-03",
+      "end_date": "2026-04-23",
+      "sharpe_ratio": 0.5268712109769979,
+      "return_cvar_ratio": 28.77776383226677,
+      "cost_rate": 0.0,
+      "total_transaction_cost": 0.0
+    },
+    {
+      "sample": "ROBUST",
+      "strategy": "ML Hard",
+      "total_return": 0.6510467019121657,
+      "mean_daily_return": 0.0003108552086692169,
+      "daily_volatility": 0.008733949920525317,
+      "annualized_volatility": 0.138647156718014,
+      "VaR_95": -0.01441193361144234,
+      "CVaR_95": -0.020848120545710738,
+      "max_drawdown": -0.23315054787394895,
+      "n_observations": 1613,
+      "start_date": "2020-01-03",
+      "end_date": "2026-04-23",
+      "sharpe_ratio": 0.5649990554365604,
+      "return_cvar_ratio": 31.228076434262135,
+      "cost_rate": 0.0,
+      "total_transaction_cost": 0.0
+    },
+    {
+      "sample": "ROBUST",
+      "strategy": "ML Probability-weighted",
+      "total_return": 0.5885970869510726,
+      "mean_daily_return": 0.0002869505836914892,
+      "daily_volatility": 0.008712880479041805,
+      "annualized_volatility": 0.13831268970344363,
+      "VaR_95": -0.014553716873924007,
+      "CVaR_95": -0.020764250901436892,
+      "max_drawdown": -0.25264527913171697,
+      "n_observations": 1613,
+      "start_date": "2020-01-03",
+      "end_date": "2026-04-23",
+      "sharpe_ratio": 0.5228120951540929,
+      "return_cvar_ratio": 28.346656459942,
+      "cost_rate": 0.0,
+      "total_transaction_cost": 0.0
+    }
+  ],
+  "common_date_exclusions": {
+    "ml_only_dates": [],
+    "regime_only_dates": [
+      "2026-04-24",
+      "2026-04-27",
+      "2026-04-28",
+      "2026-04-29",
+      "2026-04-30",
+      "2026-05-04",
+      "2026-05-05",
+      "2026-05-06",
+      "2026-05-07",
+      "2026-05-08",
+      "2026-05-11",
+      "2026-05-12",
+      "2026-05-13",
+      "2026-05-14",
+      "2026-05-15",
+      "2026-05-18",
+      "2026-05-19",
+      "2026-05-20",
+      "2026-05-21",
+      "2026-05-22"
+    ]
+  },
+  "turnover_tfm": [
+    {
+      "sample": "ROBUST",
+      "strategy": "ML Hard Classification",
+      "cost_rate": 0.001,
+      "turnover_threshold": 0.01,
+      "total_turnover": 44.99577114436846,
+      "average_daily_turnover": 0.02789570436724641,
+      "annualized_turnover": 7.029717500546096,
+      "mean_abs_change": 0.02789570436724641,
+      "median_abs_change": 0.0,
+      "raw_changes": 123,
+      "effective_changes": 123,
+      "n_observations": 1613
+    },
+    {
+      "sample": "ROBUST",
+      "strategy": "ML Probability-Weighted",
+      "cost_rate": 0.001,
+      "turnover_threshold": 0.01,
+      "total_turnover": 44.610962842172924,
+      "average_daily_turnover": 0.02765713753389518,
+      "annualized_turnover": 6.969598658541585,
+      "mean_abs_change": 0.02765713753389518,
+      "median_abs_change": 0.007327909409117539,
+      "raw_changes": 1612,
+      "effective_changes": 703,
+      "n_observations": 1613
+    }
+  ],
+  "turnover_new": [
+    {
+      "sample": "ROBUST",
+      "strategy": "ML Hard Classification",
+      "cost_rate": 0.001,
+      "turnover_threshold": 0.01,
+      "total_turnover": 42.60001845164582,
+      "average_daily_turnover": 0.026410426814411546,
+      "annualized_turnover": 6.655427557231709,
+      "mean_abs_change": 0.026410426814411546,
+      "median_abs_change": 0.0,
+      "raw_changes": 117,
+      "effective_changes": 117,
+      "n_observations": 1613
+    },
+    {
+      "sample": "ROBUST",
+      "strategy": "ML Probability-Weighted",
+      "cost_rate": 0.001,
+      "turnover_threshold": 0.01,
+      "total_turnover": 44.08647664410819,
+      "average_daily_turnover": 0.027331975600811027,
+      "annualized_turnover": 6.887657851404379,
+      "mean_abs_change": 0.027331975600811027,
+      "median_abs_change": 0.0069831744258408435,
+      "raw_changes": 1612,
+      "effective_changes": 705,
+      "n_observations": 1613
+    }
+  ],
+  "attribution_limit": "Joint effect of approved purge, runtime/defaults and recovered inputs; no unpurged control was trained.",
+  "serialization_roundtrip_exact": true,
+  "daily_inference_without_labels": true
+}

@@ -94,21 +94,43 @@ def _latest_response(row, sample: str):
 
 
 @router.get("/backtesting/results", response_model=list[AdaptiveBacktestResultRow])
-def backtesting_results(sample: str = "main"):
+def backtesting_results(sample: str = "main", strategy: str = "regime_based"):
     normalized_sample = _normalize_sample(sample)
+    if normalized_sample == "main":
+        from src.riskbex.api.operational import snapshot, backtest_points
+        points = backtest_points(snapshot(), strategy)
+        if not points.empty:
+            return points.to_dict(orient='records')
+        raise HTTPException(status_code=503, detail='No realised MAIN backtest rows available.')
+    if strategy != 'regime_based':
+        raise HTTPException(status_code=400, detail='ML strategies are available only for operational MAIN.')
     results_df = _load_results_or_raise(normalized_sample)
     return _result_records(results_df)
 
 
 @router.get("/backtesting/metrics", response_model=list[AdaptiveBacktestMetricsRow])
 def backtesting_metrics():
-    metrics_df = _load_metrics_or_raise()
-    return metrics_df.to_dict(orient="records")
+    from src.riskbex.api.operational import snapshot
+    data = snapshot()
+    records = data['metrics'].to_dict(orient='records')
+    return [dict(row, publication=data['publication']) for row in records]
 
 
 @router.get("/backtesting/latest", response_model=AdaptiveBacktestLatestResponse)
-def backtesting_latest(sample: str = "main"):
+def backtesting_latest(sample: str = "main", strategy: str = "regime_based"):
     normalized_sample = _normalize_sample(sample)
+    if normalized_sample == "main":
+        from src.riskbex.api.operational import snapshot, backtest_points
+        data = snapshot()
+        points = backtest_points(data, strategy)
+        if not points.empty:
+            return dict(points.iloc[-1].to_dict(), sample='MAIN',
+                        methodology=METHODOLOGY if strategy == 'regime_based' else
+                        'XGBoost next-session prediction with training CVaR exposure; prior-close target applied once.',
+                        signal=data['latest'])
+        raise HTTPException(status_code=503, detail='No realised MAIN backtest rows available.')
+    if strategy != 'regime_based':
+        raise HTTPException(status_code=400, detail='ML strategies are available only for operational MAIN.')
     results_df = _load_results_or_raise(normalized_sample)
     if results_df.empty:
         raise HTTPException(

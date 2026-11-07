@@ -114,6 +114,14 @@ def _records(df):
 @router.get("/regimes/latest", response_model=RegimeLatestResponse)
 def regimes_latest(split: str = "MAIN"):
     normalized_split = _normalize_split(split)
+    if normalized_split == "MAIN":
+        from src.riskbex.api.operational import snapshot, regime_points
+        data = snapshot()
+        points = regime_points(data)
+        point = points.iloc[-1].to_dict()
+        point['signal'] = data['latest']
+        point['dominant_probability'] = max(point[f'p_regime_{k}'] for k in range(3))
+        return point
     regime_df = load_regime_dataset()
     regime_summary_df = load_regime_summary()
     label_mapping = _build_label_mapping(regime_summary_df, normalized_split)
@@ -131,6 +139,12 @@ def regimes_latest(split: str = "MAIN"):
 def regimes_history(split: str = "MAIN", limit: Optional[str] = "250"):
     normalized_split = _normalize_split(split)
     records_limit = _parse_limit(limit)
+    if normalized_split == "MAIN":
+        from src.riskbex.api.operational import snapshot, regime_points
+        points = regime_points(snapshot())
+        if 'records_limit' in locals():
+            return (points if records_limit is None else points.tail(records_limit)).to_dict(orient='records')
+        return (points if records_limit is None else points.tail(records_limit)).to_dict(orient='records')
     regime_df = load_regime_dataset()
     regime_summary_df = load_regime_summary()
     label_mapping = _build_label_mapping(regime_summary_df, normalized_split)

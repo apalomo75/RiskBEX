@@ -1,0 +1,191 @@
+{
+  "status": "candidate_reference_not_final_approval",
+  "tfm_head": "8dd66a93c06dc3cbfaac29f086ad2625d32d9756",
+  "source_state": "local working tree, May 2026 outputs; not identical to HEAD",
+  "sources": {
+    "main_summary": {
+      "path": "tables/chapter4/regime_interpretation_table.csv",
+      "sha256": "8326fdd7f2a8dadaf4c27a104b776283d7d4f87e6e85716364acfde9a73bac05"
+    },
+    "robust_summary": {
+      "path": "tables/chapter4/regime_interpretation_table_robust.csv",
+      "sha256": "8ac31d8345bc81e928085dfe2fdf731ba9e6fdf4e11e82e25ecdf1dae8b1811c"
+    },
+    "main_mapping": {
+      "path": "tables/chapter4/regime_exposure_mapping.csv",
+      "sha256": "c0dd13e48b34cd1c76b153e16554322a83d04600d2a4a50dae1ad00f13193fd4"
+    },
+    "robust_mapping": {
+      "path": "tables/chapter4/regime_exposure_mapping_robust.csv",
+      "sha256": "ac7ecc7ec4be7a6f2f6ba8c7ff99513faf72eff14c582ba4998a863e4669d2ca"
+    },
+    "main_regimes": {
+      "path": "data/processed/dataset_cap4_regimes_full.csv",
+      "sha256": "7b23766dc9a6f8d440d2523dc8e5e61d069b866b1e8403a0a44d2c064d15b1db"
+    },
+    "robust_regimes": {
+      "path": "data/processed/dataset_cap4_regimes_full_robust.csv",
+      "sha256": "0f678bfa3b3008907e3c35002fbb1be145c78777ce1aa631fd48c7608ec1704f"
+    }
+  },
+  "tables": {
+    "main_summary": [
+      {
+        "regime": "0",
+        "economic_label": "low_risk",
+        "risk_order": "1",
+        "n_obs": "2047",
+        "frequency_pct": "38.8130451270383",
+        "mean_ret_1d": "0.0005750652163726415",
+        "mean_ewma_vol": "0.008126441938073652",
+        "mean_cvar_95_60d": "-0.018403623953779272",
+        "n_blocks": "136",
+        "mean_duration": "15.051470588235293",
+        "median_duration": "4.0",
+        "max_duration": "273"
+      },
+      {
+        "regime": "2",
+        "economic_label": "medium_risk",
+        "risk_order": "2",
+        "n_obs": "2582",
+        "frequency_pct": "48.95714827455442",
+        "mean_ret_1d": "-0.0005729645096867857",
+        "mean_ewma_vol": "0.014245709329724765",
+        "mean_cvar_95_60d": "-0.03116319307835888",
+        "n_blocks": "204",
+        "mean_duration": "12.656862745098039",
+        "median_duration": "4.0",
+        "max_duration": "99"
+      },
+      {
+        "regime": "1",
+        "economic_label": "high_risk",
+        "risk_order": "3",
+        "n_obs": "645",
+        "frequency_pct": "12.229806598407281",
+        "mean_ret_1d": "-0.00016661633662439076",
+        "mean_ewma_vol": "0.02581632353923167",
+        "mean_cvar_95_60d": "-0.0517607482209373",
+        "n_blocks": "68",
+        "mean_duration": "9.485294117647058",
+        "median_duration": "4.5",
+        "max_duration": "70"
+      }
+    ],
+    "robust_summary": [
+      {
+        "regime": "0",
+        "economic_label": "low_risk",
+        "risk_order": "1",
+        "n_obs": "2025",
+        "frequency_pct": "40.362766593581824",
+        "mean_ret_1d": "0.0005733572310938302",
+        "mean_ewma_vol": "0.008138664330691448",
+        "mean_cvar_95_60d": "-0.018436212415759167",
+        "n_blocks": "131",
+        "mean_duration": "15.458015267175572",
+        "median_duration": "4.0",
+        "max_duration": "273"
+      },
+      {
+        "regime": "1",
+        "economic_label": "medium_risk",
+        "risk_order": "2",
+        "n_obs": "2388",
+        "frequency_pct": "47.598166234801674",
+        "mean_ret_1d": "-0.0005524105937901943",
+        "mean_ewma_vol": "0.014086982942152083",
+        "mean_cvar_95_60d": "-0.030690811441048214",
+        "n_blocks": "184",
+        "mean_duration": "12.978260869565217",
+        "median_duration": "5.0",
+        "max_duration": "99"
+      },
+      {
+        "regime": "2",
+        "economic_label": "high_risk",
+        "risk_order": "3",
+        "n_obs": "604",
+        "frequency_pct": "12.039067171616503",
+        "mean_ret_1d": "-0.00013865858615421018",
+        "mean_ewma_vol": "0.024978988941143344",
+        "mean_cvar_95_60d": "-0.04744760824690676",
+        "n_blocks": "54",
+        "mean_duration": "11.185185185185185",
+        "median_duration": "6.0",
+        "max_duration": "73"
+      }
+    ],
+    "main_mapping": [
+      {
+        "regime": "0",
+        "economic_label": "low_risk",
+        "risk_order": "1",
+        "target_exposure": "1.0",
+        "mean_cvar_95_60d": "-0.018403623953779272",
+        "cvar_severity_abs": "0.018403623953779272",
+        "cvar_low_abs": "0.018403623953779272",
+        "defensive_alpha": "1.0",
+        "methodology": "CVaR_train_abs_ratio"
+      },
+      {
+        "regime": "2",
+        "economic_label": "medium_risk",
+        "risk_order": "2",
+        "target_exposure": "0.5905564268560006",
+        "mean_cvar_95_60d": "-0.03116319307835888",
+        "cvar_severity_abs": "0.03116319307835888",
+        "cvar_low_abs": "0.018403623953779272",
+        "defensive_alpha": "1.0",
+        "methodology": "CVaR_train_abs_ratio"
+      },
+      {
+        "regime": "1",
+        "economic_label": "high_risk",
+        "risk_order": "3",
+        "target_exposure": "0.35555173729762624",
+        "mean_cvar_95_60d": "-0.0517607482209373",
+        "cvar_severity_abs": "0.0517607482209373",
+        "cvar_low_abs": "0.018403623953779272",
+        "defensive_alpha": "1.0",
+        "methodology": "CVaR_train_abs_ratio"
+      }
+    ],
+    "robust_mapping": [
+      {
+        "regime": "0",
+        "economic_label": "low_risk",
+        "risk_order": "1",
+        "target_exposure": "1.0",
+        "mean_cvar_95_60d": "-0.018436212415759167",
+        "cvar_severity_abs": "0.018436212415759167",
+        "cvar_low_abs": "0.018436212415759167",
+        "defensive_alpha": "1.0",
+        "methodology": "CVaR_train_abs_ratio"
+      },
+      {
+        "regime": "1",
+        "economic_label": "medium_risk",
+        "risk_order": "2",
+        "target_exposure": "0.6007078845462255",
+        "mean_cvar_95_60d": "-0.030690811441048214",
+        "cvar_severity_abs": "0.030690811441048214",
+        "cvar_low_abs": "0.018436212415759167",
+        "defensive_alpha": "1.0",
+        "methodology": "CVaR_train_abs_ratio"
+      },
+      {
+        "regime": "2",
+        "economic_label": "high_risk",
+        "risk_order": "3",
+        "target_exposure": "0.38855936256726015",
+        "mean_cvar_95_60d": "-0.04744760824690676",
+        "cvar_severity_abs": "0.04744760824690676",
+        "cvar_low_abs": "0.018436212415759167",
+        "defensive_alpha": "1.0",
+        "methodology": "CVaR_train_abs_ratio"
+      }
+    ]
+  }
+}

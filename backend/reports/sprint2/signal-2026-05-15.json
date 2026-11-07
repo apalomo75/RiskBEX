@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "engine": "MAIN",
+  "package_id": "riskbex-main-v1",
+  "last_valid_session": "2026-05-15",
+  "signal_information_date": "2026-05-15",
+  "requested_as_of": "2026-05-15",
+  "information_available_after": "close_of_information_session",
+  "execution_horizon": "next_market_session",
+  "target_session_date": null,
+  "execution_rule": "Use this target during the next session; do not shift the signal again.",
+  "market": {
+    "ibex_close": 17622.69921875,
+    "ret_1d": -0.010527334442857422
+  },
+  "features": {
+    "ret_1d": -0.010527334442857422,
+    "ret_20d": -0.02614386004834377,
+    "ret_60d": -0.018703127705204194,
+    "ewma_vol": 0.012944628698998678,
+    "vol_20d": 0.012641894934830223,
+    "vol_60d": 0.01488501552927087,
+    "downside_vol_20d": 0.005993129894911277,
+    "downside_vol_60d": 0.008809285614238677,
+    "cvar_95_60d": -0.03250907637540508,
+    "drawdown": -0.04724654309876852,
+    "skew_60d": 0.09314434565442528
+  },
+  "additional_indicators": {
+    "var_95_60d": -0.023051493235676172
+  },
+  "markov": {
+    "state_date": "2026-05-15",
+    "horizon": "current_session_filtered_state",
+    "regime": 2,
+    "economic_label": "medium_risk",
+    "risk_order": 2,
+    "probabilities": {
+      "0": 0.10314907263597024,
+      "1": 0.013760267406052594,
+      "2": 0.8830906599579774
+    },
+    "parameter_id": "1884f3ed40c6aaae9a79022487659e045905b4802b507a6f8c3ce88d19e2e7d3"
+  },
+  "xgboost": {
+    "information_date": "2026-05-15",
+    "horizon": "next_market_session",
+    "regime_pred": 2,
+    "economic_label": "medium_risk",
+    "risk_order": 2,
+    "probabilities": {
+      "0": 0.18925189971923828,
+      "1": 0.0017727562226355076,
+      "2": 0.808975338935852
+    },
+    "model_id": "4368859c76af72ba48dd74158251faf0011e6a81c2162f73e94c21d98343469e"
+  },
+  "target_exposures": {
+    "regime_based": 0.5905564268560006,
+    "ml_hard": 0.5905564268560006,
+    "ml_probability_weighted": 0.6676277918505804
+  },
+  "provenance": {
+    "manifest_sha256": "1e63e51d70278a60188db1351f5f5e081f8cfa011d82ce0012317ac4f676a68c",
+    "implementation_sha256": {
+      "engine/package.py": "5dabd4c9757de121e78f43672e90494c5deff5cea9030a9d35f0a3b1f48fbfb4",
+      "engine/service.py": "2e9854bb9553ca3c9ad66ac8f92c5a088cbf60aed24a9eb90fd8b6624c2b1a48",
+      "features/market.py": "445e2fd749b89ca90ba79f21675d309e4a5f1d7a718946962e91eb861a5bc857",
+      "features/returns.py": "7165f477ac23b8bad923c6223558853c296b8a2caa2a68bfdc68d9f1556baa03",
+      "features/volatility.py": "8db94262d84676ee67bbee6415f5452c4c78e64804d91412da2a65ae707c3618",
+      "features/downside.py": "60acedef2bee1fa2f278a3eb73f72da45cbfb8163b2fc0e1815e5e3937fa762e",
+      "features/drawdown.py": "f98799b0f8b41028215224de85fe78e4ba2cb2af4c75e50e7e2b5b3a10571fea",
+      "features/tail_risk.py": "ffbed2641e5d04415ce2193616d370c8227279f851acae376f074949c0b6b4a8",
+      "ml/config.py": "b9ae0ada4649f08dcc2cf299854405c2e06803b7c8d05ade381a9df58d77fa3b",
+      "ml/data.py": "6a61ea035b9f5f8c68bf889d6946f6cb351321ba6ad03d6e612325b51a0703f0",
+      "ml/inference.py": "9a2764a0e52c080589193f2a95f1009263e90f55f891da935de8c78ff947120a",
+      "regimes/persistence.py": "00ce10de778f58d7bd2e41d9432ece824f0bedc9d2d2f36b63e04dab634049c3",
+      "backtesting/exposures.py": "09a2ce1a74ea23ec5abc6a47a361983d603b2e8dfd460c71421da327948c65b2"
+    },
+    "component_sha256": {
+      "markov/metadata.json": "5a510967585e8662e525882163854587702d3f35cef12a19338fb9fe755fce50",
+      "markov/parameters.json": "1884f3ed40c6aaae9a79022487659e045905b4802b507a6f8c3ce88d19e2e7d3",
+      "markov/validation.json": "a0f13a8d509c391d51649aa49bbb18a2617b81242cbe7210b80c379e746bab6a",
+      "markov/cvar_mapping.json": "c6a5d042a4101029cd5b35a33d90dee4522b0034d77ba017ddf5499548a0d2f2",
+      "xgboost/metadata.json": "9067b6f7b7e7601432a4269479493fefdff2258dda861de43f01536b8762d07a",
+      "xgboost/model.ubj": "4368859c76af72ba48dd74158251faf0011e6a81c2162f73e94c21d98343469e",
+      "xgboost/validation.json": "88172d08547b6102a9eb336d28af9b809d3078305d8f18955a6166d8b2b194bf"
+    },
+    "price_prefix_sha256": "b1cdb9dcb806012fea9daaec1336061e4dd95080065d0b9aa4b105aef0fe74fa",
+    "price_rows_including_initialization": 6706,
+    "first_price_session": "2000-01-03",
+    "last_price_session": "2026-05-15",
+    "required_versions": {
+      "python": "3.11.14",
+      "statsmodels": "0.14.5",
+      "numpy": "2.3.4",
+      "pandas": "2.3.3",
+      "scipy": "1.16.2",
+      "scikit-learn": "1.7.2",
+      "xgboost": "3.0.5"
+    },
+    "regime_reference_sha256": "7b23766dc9a6f8d440d2523dc8e5e61d069b866b1e8403a0a44d2c064d15b1db",
+    "models_retrained": false,
+    "source": "caller_supplied_historical_prices",
+    "closed_sessions_required": true,
+    "live_market_freshness_verified": false
+  }
+}

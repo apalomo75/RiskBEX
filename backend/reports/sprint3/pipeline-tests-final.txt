@@ -1,0 +1,45 @@
+test_concurrency (test_daily_pipeline.CalendarAndProviderTests.test_concurrency) ... ok
+test_delay_after_close (test_daily_pipeline.CalendarAndProviderTests.test_delay_after_close) ... ok
+test_empty_store (test_daily_pipeline.CalendarAndProviderTests.test_empty_store) ... ok
+test_empty_yahoo (test_daily_pipeline.CalendarAndProviderTests.test_empty_yahoo) ... ok
+test_holiday (test_daily_pipeline.CalendarAndProviderTests.test_holiday) ... ok
+test_missing_or_revised_sessions (test_daily_pipeline.CalendarAndProviderTests.test_missing_or_revised_sessions) ... ok
+test_next_session (test_daily_pipeline.CalendarAndProviderTests.test_next_session) ... ok
+test_price_validation (test_daily_pipeline.CalendarAndProviderTests.test_price_validation) ... ok
+test_timezone_required (test_daily_pipeline.CalendarAndProviderTests.test_timezone_required) ... ok
+test_unknown_calendar (test_daily_pipeline.CalendarAndProviderTests.test_unknown_calendar) ... ok
+test_weekend (test_daily_pipeline.CalendarAndProviderTests.test_weekend) ... ok
+test_yahoo_schema (test_daily_pipeline.CalendarAndProviderTests.test_yahoo_schema) ... ok
+test_corrupt_publication (test_daily_pipeline.PipelineTests.test_corrupt_publication) ... ok
+test_future_extension_does_not_change_past_signals (test_daily_pipeline.PipelineTests.test_future_extension_does_not_change_past_signals) ... ok
+test_future_observation_rejected (test_daily_pipeline.PipelineTests.test_future_observation_rejected) ... ok
+test_incomplete_response (test_daily_pipeline.PipelineTests.test_incomplete_response) ... ok
+test_inference_failure (test_daily_pipeline.PipelineTests.test_inference_failure) ... ok
+test_integral_frozen_regression (test_daily_pipeline.PipelineTests.test_integral_frozen_regression) ... ok
+test_pointer_failure_retains_current (test_daily_pipeline.PipelineTests.test_pointer_failure_retains_current) ... ERROR
+test_provider_failure_retains_current (test_daily_pipeline.PipelineTests.test_provider_failure_retains_current) ... ok
+test_stale_gate_before_download (test_daily_pipeline.PipelineTests.test_stale_gate_before_download) ... ok
+test_success_idempotence_continuity_no_fit (test_daily_pipeline.PipelineTests.test_success_idempotence_continuity_no_fit) ... ok
+test_training_revision_before_download (test_daily_pipeline.PipelineTests.test_training_revision_before_download) ... ok
+test_write_failure_retains_current (test_daily_pipeline.PipelineTests.test_write_failure_retains_current) ... ok
+
+======================================================================
+ERROR: test_pointer_failure_retains_current (test_daily_pipeline.PipelineTests.test_pointer_failure_retains_current)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/apalo/projects/RiskBEX/backend/tests/test_daily_pipeline.py", line 145, in test_pointer_failure_retains_current
+    with patch('src.riskbex.pipeline.store.os.replace',side_effect=fail):
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/apalo/projects/RiskBEX/backend/tests/test_daily_pipeline.py", line 100, in run_update
+    return update_main(self.package,self.seed,self.provider,calendar(),self.store,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/apalo/projects/RiskBEX/backend/src/riskbex/pipeline/service.py", line 91, in update_main
+    'previous_version': current.name if current else None}
+  File "/home/apalo/projects/RiskBEX/backend/src/riskbex/pipeline/store.py", line 128, in publish
+    raise ValueError('Existing orphan version differs; manual review required.')
+ValueError: Existing orphan version differs; manual review required.
+
+----------------------------------------------------------------------
+Ran 24 tests in 137.308s
+
+FAILED (errors=1)

@@ -1,0 +1,59 @@
+{
+  "sample": "main",
+  "technical_validation": "passed",
+  "historical_probability_equivalence": false,
+  "deployment_activated": false,
+  "specification": {
+    "k_regimes": 3,
+    "trend": "c",
+    "switching_variance": true
+  },
+  "initialization": "steady-state",
+  "initial_probabilities": [
+    0.3998725299888099,
+    0.13625350943269368,
+    0.463873960578497
+  ],
+  "statsmodels_version": "0.14.5",
+  "versions": {
+    "python": "3.11.14",
+    "statsmodels": "0.14.5",
+    "numpy": "2.3.4",
+    "pandas": "2.3.3",
+    "scipy": "1.16.2"
+  },
+  "history_start": "2000-03-28",
+  "trained_through": "2020-12-31",
+  "economic_classes": [
+    {
+      "regime": 0,
+      "economic_label": "low_risk",
+      "risk_order": 1
+    },
+    {
+      "regime": 2,
+      "economic_label": "medium_risk",
+      "risk_order": 2
+    },
+    {
+      "regime": 1,
+      "economic_label": "high_risk",
+      "risk_order": 3
+    }
+  ],
+  "parameters_file": "parameters.json",
+  "parameters_sha256": "1884f3ed40c6aaae9a79022487659e045905b4802b507a6f8c3ce88d19e2e7d3",
+  "cvar_mapping_file": "cvar_mapping.json",
+  "cvar_mapping_sha256": "c6a5d042a4101029cd5b35a33d90dee4522b0034d77ba017ddf5499548a0d2f2",
+  "validation_sha256": "a0f13a8d509c391d51649aa49bbb18a2617b81242cbe7210b80c379e746bab6a",
+  "academic_regimes_sha256": "7b23766dc9a6f8d440d2523dc8e5e61d069b866b1e8403a0a44d2c064d15b1db",
+  "compatible_xgboost_metadata_sha256": "9067b6f7b7e7601432a4269479493fefdff2258dda861de43f01536b8762d07a",
+  "fit_recipe": {
+    "method": "bfgs",
+    "em_iter": 5,
+    "search_reps": 0,
+    "disp": false,
+    "name": "convergence_500",
+    "maxiter": 500
+  }
+}

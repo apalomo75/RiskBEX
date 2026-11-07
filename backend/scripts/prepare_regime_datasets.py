@@ -10,6 +10,8 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.riskbex.paths import PROCESSED_DATA_DIR, REGIME_DATASET_PATH, REGIME_SUMMARY_PATH
+from src.riskbex.backtesting.exposures import build_cvar_exposure_mapping
+from src.riskbex.regimes.interpretation import build_regime_summary
 
 
 MAIN_OUTPUT_PATH = PROCESSED_DATA_DIR / "regime_dataset_main.csv"
@@ -33,25 +35,6 @@ REGIME_DATASET_REQUIRED_COLUMNS = [
 ]
 OPTIONAL_MARKET_COLUMNS = ["ewma_vol", "cvar_95_60d"]
 REGIME_SUMMARY_REQUIRED_COLUMNS = ["split", "regime", "economic_label", "risk_order"]
-
-EXPOSURE_BY_RISK_ORDER = {
-    1: 1.00,
-    2: 0.75,
-    3: 0.25,
-}
-
-EXPECTED_MAIN_MAPPING = [
-    {"regime": 0, "economic_label": "low_risk", "risk_order": 1, "target_exposure": 1.00},
-    {"regime": 2, "economic_label": "medium_risk", "risk_order": 2, "target_exposure": 0.75},
-    {"regime": 1, "economic_label": "high_risk", "risk_order": 3, "target_exposure": 0.25},
-]
-
-EXPECTED_ROBUST_MAPPING = [
-    {"regime": 0, "economic_label": "low_risk", "risk_order": 1, "target_exposure": 1.00},
-    {"regime": 1, "economic_label": "medium_risk", "risk_order": 2, "target_exposure": 0.75},
-    {"regime": 2, "economic_label": "high_risk", "risk_order": 3, "target_exposure": 0.25},
-]
-
 
 def validate_columns(df, required_columns, dataset_name):
     missing_columns = [column for column in required_columns if column not in df.columns]
@@ -135,28 +118,8 @@ def build_clean_regime_dataset(regime_df, regime_summary_df, split, split_column
 
 
 def build_exposure_mapping(regime_summary_df, split):
-    mapping_df = build_label_mapping(regime_summary_df, split).reset_index()
-    mapping_df["economic_label"] = mapping_df["economic_label"].map(normalize_label)
-    mapping_df["target_exposure"] = mapping_df["risk_order"].map(EXPOSURE_BY_RISK_ORDER)
-    mapping_df = mapping_df.sort_values("risk_order").reset_index(drop=True)
-    mapping_df = mapping_df[
-        ["regime", "economic_label", "risk_order", "target_exposure"]
-    ]
-    if mapping_df["target_exposure"].isna().any():
-        raise ValueError(f"{split} exposure mapping has null target_exposure values.")
-    return mapping_df
-
-
-def validate_expected_mapping(mapping_df, expected_mapping, split):
-    expected_df = pd.DataFrame(expected_mapping)
-    comparable_mapping = mapping_df.reset_index(drop=True)
-    comparable_expected = expected_df.reset_index(drop=True)
-    if not comparable_mapping.equals(comparable_expected):
-        raise ValueError(
-            f"{split} exposure mapping does not match expected TFM mapping.\n"
-            f"Observed:\n{comparable_mapping.to_string(index=False)}\n"
-            f"Expected:\n{comparable_expected.to_string(index=False)}"
-        )
+    split_summary = regime_summary_df.loc[regime_summary_df["split"] == split]
+    return build_cvar_exposure_mapping(split_summary)
 
 
 def print_dataset_summary(name, df, split_column):
@@ -171,10 +134,10 @@ def print_dataset_summary(name, df, split_column):
 
 def main():
     regime_df = pd.read_csv(REGIME_DATASET_PATH)
-    regime_summary_df = pd.read_csv(REGIME_SUMMARY_PATH)
-
     validate_columns(regime_df, REGIME_DATASET_REQUIRED_COLUMNS, "regime dataset")
     validate_columns(regime_df, OPTIONAL_MARKET_COLUMNS, "regime dataset")
+    # Never reuse an old full-sample summary to determine historical exposures.
+    regime_summary_df = build_regime_summary(regime_df)
     validate_columns(regime_summary_df, REGIME_SUMMARY_REQUIRED_COLUMNS, "regime summary")
 
     main_df = build_clean_regime_dataset(
@@ -194,9 +157,7 @@ def main():
 
     main_mapping_df = build_exposure_mapping(regime_summary_df, "MAIN")
     robust_mapping_df = build_exposure_mapping(regime_summary_df, "ROBUST")
-    validate_expected_mapping(main_mapping_df, EXPECTED_MAIN_MAPPING, "MAIN")
-    validate_expected_mapping(robust_mapping_df, EXPECTED_ROBUST_MAPPING, "ROBUST")
-
+    regime_summary_df.to_csv(REGIME_SUMMARY_PATH, index=False)
     main_df.to_csv(MAIN_OUTPUT_PATH, index=False)
     robust_df.to_csv(ROBUST_OUTPUT_PATH, index=False)
     main_mapping_df.to_csv(MAIN_MAPPING_PATH, index=False)

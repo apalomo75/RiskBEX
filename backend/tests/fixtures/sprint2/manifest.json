@@ -1,0 +1,17 @@
+{
+  "historical_prices": {
+    "file": "historical_prices.csv.gz",
+    "source": "TFM Git 8dd66a93c06dc3cbfaac29f086ad2625d32d9756:data/raw/ibex_prices.csv",
+    "raw_sha256": "8a7ce329e83eefd32266a88d17b02a641998ab26c891af72eedda70fef44ed12"
+  },
+  "extended_prices": {
+    "file": "extended_prices.csv.gz",
+    "source": "RiskBEX/backend/data/raw/ibex_prices.csv, local snapshot only through 2026-05-15",
+    "raw_sha256": "7c9b01c8a5b2fa40afe111c57146c165f0e5ee224d54ec694cc627ac926cc7bb"
+  },
+  "causal_main_predictions": {
+    "file": "causal_main_predictions.csv.gz",
+    "source": "RiskBEX/backend/experiments/sprint-1c-causal-v1/main/validation_predictions.csv.gz",
+    "raw_sha256": "9cc95a6c15997f49505434e3bef394f8748410a36993f982f4f2835494d826cb"
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "recipes": [
+    {
+      "name": "notebook_100",
+      "maxiter": 100
+    },
+    {
+      "name": "convergence_500",
+      "maxiter": 500
+    }
+  ],
+  "fit": {
+    "method": "bfgs",
+    "em_iter": 5,
+    "search_reps": 0,
+    "disp": false
+  },
+  "specification": {
+    "k_regimes": 3,
+    "trend": "c",
+    "switching_variance": true
+  },
+  "initialization": "steady-state",
+  "historical_probability_atol": 1e-06,
+  "mapping_atol": 1e-12,
+  "mapping_rtol": 1e-10,
+  "technical_gates": [
+    "converged",
+    "valid_parameters",
+    "zero_train_regime_mismatches",
+    "zero_full_regime_mismatches",
+    "same_economic_ids",
+    "same_train_cvar_mapping"
+  ],
+  "selection": "First predeclared recipe passing all technical gates; probability equivalence reported separately.",
+  "oos_use": "Validation only; never an optimizer input or return-based selection criterion.",
+  "pair_release": "Both MAIN and ROBUST must pass. Partial successes remain offline candidates."
+}

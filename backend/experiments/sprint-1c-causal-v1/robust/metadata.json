@@ -1,0 +1,118 @@
+{
+  "sample": "robust",
+  "trained_through": "2019-12-31",
+  "last_feature_date": "2019-12-30",
+  "feature_columns": [
+    "ret_1d",
+    "ret_20d",
+    "ret_60d",
+    "ewma_vol",
+    "vol_20d",
+    "vol_60d",
+    "downside_vol_20d",
+    "downside_vol_60d",
+    "cvar_95_60d",
+    "drawdown",
+    "skew_60d"
+  ],
+  "classes": [
+    0,
+    1,
+    2
+  ],
+  "economic_classes": [
+    {
+      "regime": 0,
+      "economic_label": "low_risk",
+      "risk_order": 1
+    },
+    {
+      "regime": 1,
+      "economic_label": "medium_risk",
+      "risk_order": 2
+    },
+    {
+      "regime": 2,
+      "economic_label": "high_risk",
+      "risk_order": 3
+    }
+  ],
+  "sha256": "f53d36b69f3cb12f25424bd3d0f6e306e04be8719b0c52d5be0e129c739eb2fa",
+  "xgboost_version": "3.0.5",
+  "versions": {
+    "python": "3.11.14",
+    "python_executable": "/home/apalo/miniconda3/envs/fin-forecasting/bin/python",
+    "pandas": "2.3.3",
+    "numpy": "2.3.4",
+    "scikit_learn": "1.7.2",
+    "xgboost": "3.0.5"
+  },
+  "boundary_policy": "causal",
+  "training_input": {
+    "sha256_csv": "5db4b5efdabb4adcd6d34ae47d74f5826919e9590233717ba62ce3cba8a2cdca",
+    "sha256_gzip": "51511900c812ffd5b97ac8dee33fedffca6eeb51b2115eb79b328e1ff0cef2e2",
+    "rows": 5016
+  },
+  "validation_input": {
+    "sha256_csv": "034a9deedc3f2396af1bf322048e21434692f723a512bf39d505bbd884454acd",
+    "sha256_gzip": "36c5fc3ed9040ac0f1cb6c32a15b55ce294190b4fad16d6d7f5d06d5d0c9f77a",
+    "rows": 1614
+  },
+  "source_provenance": {
+    "regimes_sha256": "0f678bfa3b3008907e3c35002fbb1be145c78777ce1aa631fd48c7608ec1704f",
+    "saved_train_sha256": "83d96a15723b6faf923b83e0639610d00695e616988f45ec21f953e5c74bbfb7",
+    "saved_train_source": "data/processed/dataset_cap4_regimes_train_robust.csv",
+    "predictions_sha256": "82e461b15d770404e9251021ed38eee2fd91cef9c371a23d9234dbdc92edb5ba",
+    "historical_train_rows": 5017,
+    "purged_train_rows": 5016,
+    "first_feature_date": "2000-03-28",
+    "last_feature_date": "2019-12-30",
+    "last_label_date": "2019-12-31",
+    "removed_boundary_feature_date": "2019-12-31",
+    "oos_rows": 1614,
+    "oos_first_date": "2020-01-02",
+    "oos_last_date": "2026-04-23",
+    "original_oos_rows": 1633,
+    "excluded_original_dates": [
+      "2026-04-24",
+      "2026-04-27",
+      "2026-04-28",
+      "2026-04-29",
+      "2026-04-30",
+      "2026-05-04",
+      "2026-05-05",
+      "2026-05-06",
+      "2026-05-07",
+      "2026-05-08",
+      "2026-05-11",
+      "2026-05-12",
+      "2026-05-13",
+      "2026-05-14",
+      "2026-05-15",
+      "2026-05-18",
+      "2026-05-19",
+      "2026-05-20",
+      "2026-05-21"
+    ],
+    "class_counts": {
+      "1": 2388,
+      "0": 2024,
+      "2": 604
+    }
+  },
+  "preflight_sha256": "2704bb1d4e07888635e1e1dd2efab02c468f3b92e61e868a9d1b148ffd4e92c9",
+  "explicit_parameters": {
+    "n_estimators": 300,
+    "max_depth": 3,
+    "learning_rate": 0.05,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "objective": "multi:softprob",
+    "eval_metric": "mlogloss",
+    "random_state": 42,
+    "n_jobs": -1
+  },
+  "validation_sha256": "24ae9e167e5e63667e7f36f0263d868f4e68c88752ec685aad39f367d61a1ea3",
+  "inference_smoke_input_sha256": "4e8ba2af8741d950687102dd11af7f6c4acad6f21b8a8ca881ffc7b62c218e28",
+  "inference_smoke_expected_sha256": "5ef472a2734e140edc3fd741e06483d269dc23d11e29f2909ef7b98a2fae7fcd"
+}
