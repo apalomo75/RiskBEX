@@ -158,6 +158,16 @@ class PipelineTests(unittest.TestCase):
         self.provider=Provider(self.seed)
         with self.assertRaisesRegex(ValueError,'Incomplete'): self.run_update()
         self.assertIsNone(self.store.current())
+    def test_multi_session_catchup_and_interior_gap(self):
+        self.seed=self.prices.loc[self.prices.date<'2026-04-21'].copy()
+        self.provider=Provider(self.prices.loc[self.prices.date!='2026-04-22'])
+        with self.assertRaisesRegex(ValueError,'missing exchange sessions'): self.run_update()
+        self.assertIsNone(self.store.current())
+        self.provider=Provider(self.prices)
+        result=self.run_update()
+        self.assertEqual(result['new_sessions'],3)
+        stored=pd.read_csv(self.store.current()/'prices.csv')
+        self.assertEqual(stored.date.iloc[-3:].tolist(),['2026-04-21','2026-04-22','2026-04-23'])
     def test_stale_gate_before_download(self):
         write_json(self.receipt,{'status':'failed'})
         with self.assertRaisesRegex(ValueError,'regression'): self.run_update()

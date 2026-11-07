@@ -47,6 +47,7 @@ Historical methodology and acceptance records are preserved in their original fo
 - [Sprint 1D: Markov reconstruction and ROBUST compatibility](docs/sprint-1d.md).
 - [Sprint 2: frozen MAIN engine and incremental release plan](docs/sprint-2.md).
 - [Sprint 3: versioned MAIN pipeline and operational commands](docs/sprint-3.md).
+- [Sprint 6A: scheduled live updates, systemd setup and recovery](docs/sprint-6a.md).
 
 Frozen MAIN artifacts are in `model_packages/main-v1/`. Operational updates use
 these models without retraining. Daily/full pipeline scripts require explicit

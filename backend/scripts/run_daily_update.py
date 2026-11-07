@@ -25,6 +25,15 @@ class FileProvider:
         return frame.loc[dates.between(start, end), ['date', 'ibex_close']].copy()
 
 
+def validate_store_path(path):
+    # Guard accidental use of the immutable source directories as the output store.
+    destination = path.resolve()
+    for forbidden in [BACKEND / 'data', BACKEND / 'tests', BACKEND / 'model_packages',
+                      BACKEND / 'experiments', BACKEND.parent.parent / 'TMF-Market-Regimes-Risk-Portfolio']:
+        if destination == forbidden.resolve() or forbidden.resolve() in destination.parents:
+            raise ValueError('Store must be separate from academic, model, fixture and legacy data directories')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--seed', type=Path, required=True, help='Validated complete local price history; never overwritten')
@@ -39,12 +48,10 @@ def main():
     args = parser.parse_args()
     if args.fetch and args.now:
         parser.error('--now is simulation-only and cannot be used for a real download')
-    # Guard accidental use of the immutable source directories as the output store.
-    destination = args.store.resolve()
-    for forbidden in [BACKEND / 'data', BACKEND / 'tests', BACKEND / 'model_packages',
-                      BACKEND / 'experiments', BACKEND.parent.parent / 'TMF-Market-Regimes-Risk-Portfolio']:
-        if destination == forbidden.resolve() or forbidden.resolve() in destination.parents:
-            parser.error('Store must be separate from academic, model, fixture and legacy data directories')
+    try:
+        validate_store_path(args.store)
+    except ValueError as exc:
+        parser.error(str(exc))
     package = load_main_package(args.package)
     provider = YahooProvider() if args.fetch else FileProvider(args.provider_file)
     result = update_main(package, pd.read_csv(args.seed, float_precision='round_trip'), provider,

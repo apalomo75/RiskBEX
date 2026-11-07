@@ -1,0 +1,14 @@
+[Unit]
+Description=RISKBEX frozen MAIN daily market update
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/projects/RiskBEX/backend
+EnvironmentFile=%h/.config/riskbex/daily.env
+ExecStart=/usr/bin/env ${RISKBEX_PYTHON} -B scripts/run_scheduled_update.py --fetch --seed ${RISKBEX_SEED} --store ${RISKBEX_OPERATIONAL_DIR} --regression-receipt ${RISKBEX_REGRESSION_RECEIPT} --calendar ${RISKBEX_CALENDAR}
+TimeoutStartSec=30min
+UMask=0077
+StandardOutput=journal
+StandardError=journal

@@ -1,0 +1,10 @@
+[Unit]
+Description=RISKBEX Madrid closing-data attempts and recovery
+
+[Timer]
+OnCalendar=*-*-* 20,21,22:15:00 Europe/Madrid
+Persistent=true
+Unit=riskbex-daily.service
+
+[Install]
+WantedBy=timers.target
