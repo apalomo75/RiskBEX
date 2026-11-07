@@ -50,7 +50,19 @@ def regime_points(data):
 
 
 def risk_points(data):
-    frame = data['features'].merge(regime_points(data)[['date', 'regime_label']], on='date', validate='one_to_one')
+    signals = regime_points(data).copy()
+    optional = {'xgboost_regime':'regime_pred','xgboost_probability_0':'proba_0',
+      'xgboost_probability_1':'proba_1','xgboost_probability_2':'proba_2',
+      'target_exposure_regime_based':'target_exposure_regime_based',
+      'target_exposure_ml_hard':'target_exposure_ml_hard',
+      'target_exposure_ml_probability_weighted':'target_exposure_ml_proba'}
+    cols = ['date','regime','economic_label','p_regime_0','p_regime_1','p_regime_2']
+    cols += [c for c in optional.values() if c in signals]
+    signals = signals[cols].rename(columns={v:k for k,v in optional.items() if v in signals})
+    frame = data['features'].merge(signals, on='date', validate='one_to_one')
+    frame['information_date'] = frame['date'].astype(str)
+    frame['model_version'] = data['publication']['model_version']
+    frame['next_session_date'] = None
     # The frozen engine does not publish the legacy heuristic score. Do not invent one.
     frame['risk_score'] = None
     frame['risk_level'] = frame.regime_label

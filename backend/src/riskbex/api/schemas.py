@@ -24,6 +24,21 @@ class LatestRiskResponse(PublicationResponse):
 
 
 class HistoricalRiskPoint(PublicationResponse):
+    information_date: str | None = None
+    current_markov_regime: int | None = None
+    markov_probability_0: float | None = None
+    markov_probability_1: float | None = None
+    markov_probability_2: float | None = None
+    xgboost_regime: int | None = None
+    xgboost_probability_0: float | None = None
+    xgboost_probability_1: float | None = None
+    xgboost_probability_2: float | None = None
+    target_exposure_regime_based: float | None = None
+    target_exposure_ml_hard: float | None = None
+    target_exposure_ml_probability_weighted: float | None = None
+    model_version: str | None = None
+    next_session_date: str | None = None
+    ibex_close: float | None = None
     date: str
     vol_20d: float
     vol_60d: float

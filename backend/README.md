@@ -1,71 +1,56 @@
-# RISKBEX Backend
+# RISKBEX
 
-Sprint 1A: [interpretación de entrenamiento, mapping CVaR y pruebas de equivalencia](docs/sprint-1a.md).
-La interfaz principal sigue siendo `dashboard.py`, con las seis pestañas existentes.
+Understand risk. Adapt exposure.
 
-Sprint 1B: [ML, estrategias históricas y estado de recuperación de modelos](docs/sprint-1b.md).
-Verificación offline, sin entrenar ni regenerar CSV operativos:
+Monitor IBEX 35 risk through market regimes, Machine Learning and Conditional
+Value at Risk. Explore quantitative signals, compare strategies and analyse their
+historical performance. Author: Alejandro Palomo Morales.
 
-```bash
-python -B -m unittest discover -s tests -v
-python -B scripts/check_ml_equivalence.py
-```
+The platform uses English exclusively. `dashboard.py` is the main Streamlit
+interface, with six sections: Monitor, Explore, Results, Models, Research and Tail
+Risk. MAIN is the only operational engine; ROBUST is an academic reference.
+There is no cost simulator in v0.1.
 
-Sprint 1C: [modelos XGBoost purgados, procedencia y validación](docs/sprint-1c.md).
-Los modelos están en `experiments/sprint-1c-causal-v1/`; no se han activado en
-el pipeline diario ni en los endpoints públicos.
+## Run locally
 
-Sprint 1D: [reconstrucción Markov y bloqueo de compatibilidad ROBUST](docs/sprint-1d.md).
-La pareja permanece bloqueada para revisión; los parámetros de diagnóstico están
-separados en `experiments/sprint-1d-markov-v2/` y no se usan operativamente.
-
-Sprint 2: [motor MAIN offline y plan de publicación incremental v0.1](docs/sprint-2.md).
-Por decisión de producto, MAIN 500 + XGBoost MAIN causal-v1 es el paquete principal;
-ROBUST permanece como validación académica y no requiere promoción diaria.
-El paquete `model_packages/main-v1/` aún no se conecta a la API ni al pipeline.
-
-Ejecución offline con el runtime registrado en el manifiesto:
-
-```bash
-python -B scripts/run_main_offline.py --package model_packages/main-v1 \
-  --prices tests/fixtures/sprint2/extended_prices.csv.gz --as-of 2026-05-15
-```
-
-## Pipeline de ejecucion RISKBEX
-
-Para generar los outputs derivados del sistema analitico:
-
-```bash
-cd backend
-PYTHONPATH=src python scripts/run_full_pipeline.py
-```
-
-El comando anterior ejecuta, en orden:
-
-```bash
-python scripts/prepare_regime_datasets.py
-PYTHONPATH=src python scripts/run_adaptive_backtest.py
-PYTHONPATH=src python scripts/run_tail_analysis.py
-```
-
-Para levantar la API:
+From `backend`, using the existing environment and installed dependencies:
 
 ```bash
 uvicorn main:app --reload
 ```
 
-Para levantar el dashboard:
+In another terminal:
 
 ```bash
 streamlit run dashboard.py
 ```
 
-Nota metodologica: el pipeline no recalcula Markov Switching. Consume los outputs de regimenes ya generados, prepara datasets limpios MAIN/ROBUST, ejecuta backtesting adaptativo y calcula Tail Risk sobre los outputs de backtesting.
+`RISKBEX_API_URL` defaults to `http://127.0.0.1:8000`.
+The API reads validated versioned MAIN publications from `runtime/main`, or
+`RISKBEX_OPERATIONAL_DIR` when configured. If no usable publication exists, the
+interface reports unavailable data; academic results are not presented as live.
+Launching the interface does not download prices or retrain models. The manual
+Update Market Data control invokes the existing operational update endpoint.
 
-Los CSV generados en `backend/data/processed/` son derivados, pueden estar ignorados por Git y son regenerables mediante `scripts/run_full_pipeline.py`.
+## Interface checks
 
-Este script sera la base para automatizar la generacion de outputs dentro de Docker/AWS antes de servir API/dashboard.
+```bash
+python -B -m unittest discover -s tests -p 'test_dashboard_ui.py' -v
+```
 
-## Sprint 3: pipeline MAIN versionado
+[Product navigation, implementation and future cost specification](docs/sprint-4c.md).
+Historical methodology and acceptance records are preserved in their original form:
 
-[Arquitectura, validación y comandos](docs/sprint-3.md). `run_daily_update.py` y `run_full_pipeline.py` requieren argumentos explícitos, un recibo de regresión vigente y un directorio separado. Sin argumentos no descargan ni sobrescriben CSV. Los scripts `run_legacy_*` conservan las herramientas anteriores para uso manual, fuera del pipeline MAIN. Las rutas y Streamlit aún no consumen las nuevas publicaciones.
+- [Sprint 1A: training interpretation, CVaR mapping and equivalence](docs/sprint-1a.md).
+- [Sprint 1B: ML, historical strategies and model recovery](docs/sprint-1b.md).
+- [Sprint 1C: purged XGBoost models, provenance and validation](docs/sprint-1c.md).
+- [Sprint 1D: Markov reconstruction and ROBUST compatibility](docs/sprint-1d.md).
+- [Sprint 2: frozen MAIN engine and incremental release plan](docs/sprint-2.md).
+- [Sprint 3: versioned MAIN pipeline and operational commands](docs/sprint-3.md).
+
+Frozen MAIN artifacts are in `model_packages/main-v1/`. Operational updates use
+these models without retraining. Daily/full pipeline scripts require explicit
+arguments, a valid regression receipt and a separate output directory. Legacy
+scripts remain available for manual research use. Do not regenerate historical
+artifacts as part of interface work. Scheduling and deployment require separate
+authorisation.

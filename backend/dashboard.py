@@ -1,3 +1,5 @@
+import inspect
+import altair as alt
 import streamlit as st
 import requests
 import pandas as pd
@@ -5,7 +7,7 @@ import os
 import matplotlib.pyplot as plt
 from pathlib import Path
 
-API_URL = os.getenv("RISKBEX_API_URL", "http://127.0.0.1:8000")
+API_URL = os.getenv("RISKBEX_API_URL", "http://127.0.0.1:8000").rstrip("/")
 BASE_DIR = Path(__file__).resolve().parent
 FIGURES_DIR = BASE_DIR / "figures" / "chapter2"
 
@@ -512,34 +514,26 @@ st.markdown(
 
 
 def show_landing():
-    st.markdown(
-        """
-        <a href="?enter=1" class="hero-link">
-            <div class="landing-wrapper">
-                <div class="landing-box">
-                    <div class="landing-content">
-                        <div class="landing-kicker">Proyecto académico aplicado</div>
-                        <div class="landing-title">Bienvenido a RISKBEX</div>
-                        <div class="landing-subline">TFM to applied risk monitoring dashboard</div>
-                        <div class="landing-author">Desarrollado por Alejandro Palomo Morales</div>
-                        <div class="landing-subtitle">
-                            RISKBEX es la capa de presentación de un proyecto académico centrado en la monitorización interpretable del riesgo extremo del IBEX 35. El sistema construye variables de riesgo de mercado a partir de datos del índice y evalúa las condiciones de deterioro mediante medidas como la volatilidad, el drawdown y el Conditional Value at Risk para facilitar el seguimiento del entorno de riesgo.
-                        </div>
-                        <div class="landing-badges">
-                            <span class="landing-badge">Tail Risk</span>
-                            <span class="landing-badge">Market Regimes</span>
-                            <span class="landing-badge">Risk Monitoring</span>
-                        </div>
-                        <div class="landing-hint">
-                            Haz clic en cualquier parte para entrar al dashboard
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </a>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown("""
+    <div class="topbar">
+        <div class="landing-kicker">IBEX 35 · Quantitative Risk Intelligence</div>
+        <h1 class="landing-title">RISKBEX</h1>
+        <h2>Understand risk. Adapt exposure.</h2>
+        <p class="landing-subtitle">Monitor IBEX 35 risk through market regimes,
+        Machine Learning and Conditional Value at Risk. Explore quantitative signals,
+        compare strategies and analyse their historical performance.</p>
+        <p class="landing-author">Alejandro Palomo Morales</p>
+    </div>
+    """, unsafe_allow_html=True)
+    for col, page, description in zip(st.columns(3),
+            ["Monitor", "Explore", "Models"],
+            ["Market conditions and operational signals.",
+             "Interactive risk history and portfolio exposure.",
+             "Understand Markov regimes, XGBoost and CVaR."]):
+        with col:
+            st.markdown(f"### {page}")
+            st.write(description)
+            st.link_button(f"Open {page}", f"?enter=1&view={page}")
 
 
 def metric_card(label: str, value: str, note: str):
@@ -560,24 +554,24 @@ def render_status_box(regime_label: str, risk_score: float):
 
     if regime == "stress":
         css_class = "status-box status-stress"
-        title = "Régimen de estrés"
+        title = "High Risk"
         text = (
-            "El mercado muestra señales de inestabilidad elevada, mayor presión bajista "
-            "y un entorno menos favorable para asumir riesgo."
+            "Market conditions indicate elevated instability, stronger downside pressure "
+            "and less favourable conditions for risk exposure."
         )
     elif regime == "turbulence":
         css_class = "status-box status-turbulence"
-        title = "Régimen de turbulencia"
+        title = "Medium Risk"
         text = (
-            "El mercado se encuentra en una fase intermedia de riesgo. No es un escenario "
-            "plenamente extremo, pero sí aparecen señales de tensión."
+            "The market is in a medium risk phase. Conditions are "
+            "not extreme, but signs of stress are emerging."
         )
     else:
         css_class = "status-box status-calm"
-        title = "Régimen de calma"
+        title = "Low Risk"
         text = (
-            "El mercado se encuentra en una fase relativamente estable, con riesgo a la baja "
-            "más contenido y menor presión agregada."
+            "The market is relatively stable, with more contained downside risk "
+            "and lower overall pressure."
         )
 
     st.markdown(
@@ -585,8 +579,8 @@ def render_status_box(regime_label: str, risk_score: float):
         <div class="{css_class}">
             <div class="status-title">{title}</div>
             <div class="status-text">
-                Régimen detectado: <b>{regime_label.upper()}</b><br>
-                Nivel de riesgo agregado: <b>{int(risk_score)} / 100</b>
+                Detected Regime: <b>{regime_label.upper()}</b><br>
+                Aggregate Relative Risk: <b>{int(risk_score)} / 100</b>
             </div>
             <div class="status-text" style="margin-top: 0.5rem;">
                 {text}
@@ -602,6 +596,105 @@ def load_latest_data():
     response = requests.get(f"{API_URL}/latest-risk", timeout=10)
     response.raise_for_status()
     return response.json()
+
+
+def risk_label(value):
+    return {"low_risk": "Low Risk", "medium_risk": "Medium Risk",
+            "high_risk": "High Risk", "calm": "Low Risk",
+            "turbulence": "Medium Risk", "stress": "High Risk"}.get(
+                str(value).lower(), str(value or "N/A"))
+
+
+def presentation_frame(frame):
+    display = frame.copy()
+    for column in ["economic_label", "regime_label"]:
+        if column in display:
+            display[column] = display[column].map(risk_label)
+    return display.rename(columns={column: column.replace("_", " ").title() for column in display.columns})
+
+
+def select_period(frame, key):
+    if frame.empty:
+        return frame
+    period = st.selectbox("Observation Period", ["Last 3 Months", "Last Year", "All Available"], key=key)
+    days = {"Last 3 Months": 92, "Last Year": 366}.get(period)
+    st.caption(f"Available history ends on {frame.date.max():%Y-%m-%d}; periods are measured from that session.")
+    return frame if days is None else frame[frame.date >= frame.date.max() - pd.Timedelta(days=days)]
+
+
+def render_price_regimes(frame):
+    required = {"date", "ibex_close", "regime_label"}
+    if frame.empty or not required.issubset(frame.columns):
+        st.caption("IBEX 35 price and regime chart unavailable: aligned price history is not published.")
+        return
+    chart_data = frame.dropna(subset=list(required)).copy()
+    if chart_data.empty:
+        st.caption("No aligned prices and regimes are available for this period.")
+        return
+    chart_data["Market Regime"] = chart_data.regime_label.map(risk_label)
+    chart_data = chart_data.rename(columns={"ibex_close": "IBEX 35 Close", "date": "Session"})
+    base = alt.Chart(chart_data).encode(x=alt.X("Session:T", title="Market Session"),
+        y=alt.Y("IBEX 35 Close:Q", scale=alt.Scale(zero=False)))
+    chart = base.mark_line(color="#d6c2a8").encode() + base.mark_circle(size=28).encode(
+        color=alt.Color("Market Regime:N", scale=alt.Scale(
+            domain=["Low Risk", "Medium Risk", "High Risk"], range=["#7fb58a", "#d2a450", "#be5a54"])),
+        tooltip=[alt.Tooltip("Session:T"), alt.Tooltip("IBEX 35 Close:Q", format=",.2f"), "Market Regime:N"])
+    st.subheader("IBEX 35 and Market Regimes")
+    st.altair_chart(chart.interactive(), use_container_width=True)
+
+
+def render_operational_overview(data):
+    st.subheader("MAIN Operational Monitor")
+    publication = data.get("publication") or {}
+    signal = data.get("signal") or {}
+    if not publication or not signal:
+        st.warning("No verifiable operational publication is available. Legacy data must not be treated as current.")
+        return
+    freshness = publication.get("freshness")
+    labels = {"current": "Current", "stale": "Stale Market Data",
+              "simulated": "Simulated Data", "historical": "Historical Data"}
+    status = labels.get(freshness, "Unverified Freshness")
+    if freshness == "current" and publication.get("is_current") is True:
+        st.success(f"Data Freshness: {status}")
+    else:
+        st.warning(f"Data Freshness: {status}. This publication does not represent current market conditions. "
+                   f"Expected Session: {publication.get('expected_data_date') or 'N/A'}.")
+
+    def value(item, percentage=False):
+        if item is None:
+            return "N/A"
+        return f"{item:.2%}" if percentage else str(item)
+
+    cols = st.columns(3)
+    close = (signal.get("market") or {}).get("ibex_close")
+    cols[0].metric("Last Market Close · IBEX 35", f"{close:,.2f}" if close is not None else "N/A")
+    cols[1].metric("Effective Information Date", value(signal.get("signal_information_date") or signal.get("last_valid_session")))
+    cols[2].metric("Forecast Target Session", value(publication.get("target_session_date")))
+    for col, key, title, regime_key in zip(st.columns(2), ["markov", "xgboost"],
+            ["Current Market Regime · Markov", "Next-Session Regime Forecast · XGBoost"],
+            ["regime", "regime_pred"]):
+        model = signal.get(key) or {}
+        with col:
+            st.markdown(f"**{title}**")
+            st.write(f"Regime: {value(model.get(regime_key))} · {risk_label(model.get('economic_label'))}")
+            probabilities = model.get("probabilities") or {}
+            for regime in range(3):
+                st.write(f"P(Regime {regime}): {value(probabilities.get(str(regime)), True)}")
+    st.caption("Target exposures from simulated quantitative strategies; these are not personalised investment recommendations.")
+    targets = signal.get("target_exposures") or {}
+    for col, key, label in zip(st.columns(3),
+            ["regime_based", "ml_hard", "ml_probability_weighted"],
+            ["Regime-Based Strategy", "ML Hard Strategy", "Probability-Weighted Strategy"]):
+        col.metric(f"Target Portfolio Exposure {label}", value(targets.get(key), True))
+    st.markdown("**How the decision is formed.** The Regime-Based Strategy uses the filtered Markov state. "
+                "ML Hard Strategy uses the most likely XGBoost next-session state. "
+                "Probability-Weighted Strategy combines regime exposures using forecast probabilities. "
+                "Targets are for the next market session; applied historical exposure may differ.")
+    update = publication.get("update_status") or {}
+    st.caption(f"Update Status: {str(update.get('status', 'Not reported')).replace('_', ' ').title()} · "
+               f"Publication Generated: {publication.get('generated_at') or 'N/A'}")
+    st.caption(f"Frozen Model Package: {value(publication.get('model_version'))} · "
+               f"Source: {value(publication.get('source_mode'))}")
 
 
 @st.cache_data(ttl=30)
@@ -626,8 +719,8 @@ def fetch_regime_endpoint_safe(path: str, fallback, label: str):
     try:
         return fetch_regime_endpoint(path)
     except Exception as e:
-        st.warning(f"No se pudo cargar {label}.")
-        st.caption(str(e))
+        st.warning(f"Unable to load {label}.")
+        st.caption("Check API availability and the selected publication.")
         return fallback
 
 
@@ -643,10 +736,10 @@ def fetch_backtesting_endpoint_safe(path: str, fallback, label: str):
         return fetch_backtesting_endpoint(path)
     except Exception as e:
         st.warning(
-            f"No se pudo cargar {label}. Los outputs de backtesting todavía no están generados. "
-            "Ejecuta scripts/run_adaptive_backtest.py."
+            f"Unable to load {label}. Historical backtesting outputs are unavailable. "
+            "Run scripts/run_adaptive_backtest.py."
         )
-        st.caption(str(e))
+        st.caption("Check API availability and the selected publication.")
         return fallback
 
 
@@ -662,10 +755,10 @@ def fetch_tail_endpoint_safe(path: str, fallback, label: str):
         return fetch_tail_endpoint(path)
     except Exception as e:
         st.warning(
-            f"No se pudo cargar {label}. Los outputs de Tail Risk todavía no están generados. "
-            "Ejecuta scripts/run_tail_analysis.py."
+            f"Unable to load {label}. Tail risk outputs are unavailable. "
+            "Run scripts/run_tail_analysis.py."
         )
-        st.caption(str(e))
+        st.caption("Check API availability and the selected publication.")
         return fallback
 
 
@@ -680,8 +773,8 @@ def regime_card_class(economic_label: str):
 
 def split_description(split: str):
     if split == "ROBUST":
-        return "validación robusta temporal"
-    return "partición principal"
+        return "Temporal Robustness Evaluation"
+    return "Primary Split"
 
 
 def render_split_badge(split: str):
@@ -693,7 +786,7 @@ def render_split_badge(split: str):
 
 def render_regime_card(title: str, payload: dict):
     if not payload:
-        st.info("No hay estado actual disponible.")
+        st.info("No evaluated state is available.")
         return
     probability = float(payload.get("dominant_probability", 0.0))
     card_class = regime_card_class(payload.get("economic_label", ""))
@@ -701,12 +794,12 @@ def render_regime_card(title: str, payload: dict):
         f"""
         <div class="regime-card {card_class}">
             <div class="regime-card-title">{title}</div>
-            <div class="regime-card-label">{payload.get("economic_label", "N/D")}</div>
+            <div class="regime-card-label">{risk_label(payload.get("economic_label"))}</div>
             <div class="regime-card-detail">
-                Probabilidad dominante<br>
+                Dominant Probability<br>
                 <b>{probability:.1%}</b><br>
-                Orden de riesgo: <b>{int(payload.get("risk_order", 0))}</b><br>
-                Fecha: <b>{payload.get("date", "N/D")}</b>
+                Risk Order: <b>{int(payload.get("risk_order", 0))}</b><br>
+                Date: <b>{payload.get("date", "N/A")}</b>
             </div>
         </div>
         """,
@@ -724,10 +817,10 @@ def regime_probabilities(record):
 
 def confidence_label(dominant_probability):
     if dominant_probability >= 0.80:
-        return "Alta confianza"
+        return "High Confidence"
     if dominant_probability >= 0.60:
-        return "Confianza moderada"
-    return "Zona de transición"
+        return "Moderate Confidence"
+    return "Transition Zone"
 
 
 def uncertainty_metrics(record):
@@ -745,27 +838,27 @@ def uncertainty_metrics(record):
 
 def render_uncertainty_card(split: str, latest_payload: dict):
     if not latest_payload:
-        st.info("No hay datos suficientes para calcular incertidumbre probabilística.")
+        st.info("Insufficient data to assess probability uncertainty.")
         return
     metrics = uncertainty_metrics(latest_payload)
     gap_note = (
-        "El gap es estrecho: hay mezcla relevante entre estados de riesgo."
+        "The narrow probability gap indicates substantial uncertainty between risk states."
         if metrics["probability_gap"] < 0.20
-        else "El régimen dominante se separa con claridad del segundo estado."
+        else "The dominant regime has a clear probability lead over the second state."
     )
     st.markdown(
         f"""
         <div class="panel-box">
-            <div class="regime-card-title">Incertidumbre probabilística · {split}</div>
+            <div class="regime-card-title">Model Confidence · {split}</div>
             <div class="regime-card-label">{metrics["confidence_label"]}</div>
             <div class="regime-card-detail">
-                Probabilidad dominante: <b>{metrics["dominant_probability"]:.1%}</b><br>
-                Segunda probabilidad: <b>{metrics["second_probability"]:.1%}</b><br>
-                Gap probabilístico: <b>{metrics["probability_gap"]:.1%}</b>
+                Dominant Probability: <b>{metrics["dominant_probability"]:.1%}</b><br>
+                Second-Highest Probability: <b>{metrics["second_probability"]:.1%}</b><br>
+                Probability Gap: <b>{metrics["probability_gap"]:.1%}</b>
             </div>
             <div class="uncertainty-note">
                 {gap_note}<br>
-                Las probabilidades filtradas permiten representar transiciones graduales entre estados de riesgo.
+                Filtered probabilities describe gradual transitions between risk states.
             </div>
         </div>
         """,
@@ -790,7 +883,7 @@ def add_uncertainty_columns(history_df):
 
 def render_uncertainty_chart(history_df):
     if history_df.empty:
-        st.info("No hay histórico suficiente para visualizar incertidumbre.")
+        st.info("Insufficient history to display model uncertainty.")
         return
     uncertainty_df = add_uncertainty_columns(history_df)
     fig, ax = plt.subplots(figsize=(10, 3.2))
@@ -799,19 +892,19 @@ def render_uncertainty_chart(history_df):
         uncertainty_df["dominant_probability"],
         color="#d6c2a8",
         linewidth=2.0,
-        label="Probabilidad dominante",
+        label="Dominant Probability",
     )
     ax.plot(
         uncertainty_df["date"],
         uncertainty_df["probability_gap"],
         color="#7f8f7a",
         linewidth=1.8,
-        label="Gap dominante-segunda",
+        label="Dominant–Second Probability Gap",
     )
     ax.axhline(0.80, color="#7fb58a", linewidth=1.0, linestyle="--", alpha=0.55)
     ax.axhline(0.60, color="#d2a450", linewidth=1.0, linestyle="--", alpha=0.55)
     ax.set_ylim(0, 1)
-    ax.set_ylabel("Probabilidad")
+    ax.set_ylabel("Probability")
     ax.legend(facecolor="#171717", edgecolor="#4a4035", labelcolor="#ddd4c9")
     style_regime_axis(ax)
     fig.autofmt_xdate()
@@ -869,7 +962,7 @@ def render_regime_timeline(history_df):
 def render_transition_heatmap(transition_records):
     transition_df = pd.DataFrame(transition_records)
     if transition_df.empty:
-        st.info("No hay matriz de transición disponible.")
+        st.info("No transition matrix is available.")
         return
 
     labels_df = (
@@ -888,10 +981,10 @@ def render_transition_heatmap(transition_records):
     image = ax.imshow(matrix, cmap="YlOrBr", vmin=0, vmax=1)
     ax.set_xticks(range(len(labels)))
     ax.set_yticks(range(len(labels)))
-    ax.set_xticklabels(labels, rotation=25, ha="right")
-    ax.set_yticklabels(labels)
-    ax.set_xlabel("Destino")
-    ax.set_ylabel("Origen")
+    ax.set_xticklabels([risk_label(label) for label in labels], rotation=25, ha="right")
+    ax.set_yticklabels([risk_label(label) for label in labels])
+    ax.set_xlabel("Destination")
+    ax.set_ylabel("Source")
     for row_idx in range(len(labels)):
         for col_idx in range(len(labels)):
             value = matrix.iloc[row_idx, col_idx]
@@ -916,7 +1009,7 @@ def render_transition_heatmap(transition_records):
 def render_duration_bars(duration_records):
     duration_df = pd.DataFrame(duration_records)
     if duration_df.empty:
-        st.info("No hay datos de duración disponibles.")
+        st.info("No regime duration data is available.")
         return
     duration_df = duration_df.sort_values("risk_order")
     labels = duration_df["economic_label"].tolist()
@@ -930,19 +1023,19 @@ def render_duration_bars(duration_records):
         mean_positions,
         duration_df["mean_duration_trading_days"],
         width=width,
-        label="Media",
+        label="Mean",
         color="#d6c2a8",
     )
     ax.bar(
         median_positions,
         duration_df["median_duration_trading_days"],
         width=width,
-        label="Mediana",
+        label="Median",
         color="#7f8f7a",
     )
     ax.set_xticks(list(x_positions))
-    ax.set_xticklabels(labels)
-    ax.set_ylabel("Sesiones")
+    ax.set_xticklabels([risk_label(label) for label in labels])
+    ax.set_ylabel("Trading Sessions")
     ax.legend(facecolor="#171717", edgecolor="#4a4035", labelcolor="#ddd4c9")
     style_regime_axis(ax)
     fig.tight_layout()
@@ -997,30 +1090,30 @@ def strategy_metric_value(metrics_df, strategy, column):
 
 def metric_delta_note(buy_hold_value, strategy_value, metric_name, negative_is_better=False):
     if buy_hold_value is None or strategy_value is None:
-        return "Comparación no disponible."
+        return "Comparison unavailable."
     delta = strategy_value - buy_hold_value
-    if metric_name in {"VaR 95", "CVaR 95", "Max drawdown"}:
+    if metric_name in {"VaR 95", "CVaR 95", "Maximum Drawdown"}:
         if delta > 0:
-            return f"Menos severo que Buy & Hold por {abs(delta):.2%}."
+            return f"Less severe than Buy & Hold by {abs(delta):.2%}."
         if delta < 0:
-            return f"Más severo que Buy & Hold por {abs(delta):.2%}."
-        return "Sin diferencia frente a Buy & Hold."
+            return f"More severe than Buy & Hold by {abs(delta):.2%}."
+        return "No difference from Buy & Hold."
     if negative_is_better:
         if delta < 0:
-            return f"Reducción frente a Buy & Hold de {abs(delta):.2%}."
+            return f"Reduction relative to Buy & Hold of {abs(delta):.2%}."
         if delta > 0:
-            return f"Aumento frente a Buy & Hold de {abs(delta):.2%}."
-        return "Sin diferencia frente a Buy & Hold."
+            return f"Increase relative to Buy & Hold of {abs(delta):.2%}."
+        return "No difference from Buy & Hold."
     if delta > 0:
-        return f"Superior a Buy & Hold por {abs(delta):.2%}."
+        return f"Higher than Buy & Hold by {abs(delta):.2%}."
     if delta < 0:
-        return f"Inferior a Buy & Hold por {abs(delta):.2%}."
-    return "Sin diferencia frente a Buy & Hold."
+        return f"Lower than Buy & Hold by {abs(delta):.2%}."
+    return "No difference from Buy & Hold."
 
 
 def render_backtest_metric_cards(metrics_df):
     if metrics_df.empty:
-        st.info("No hay métricas de backtesting disponibles.")
+        st.info("No backtesting metrics are available.")
         return
 
     metrics = [
@@ -1028,7 +1121,7 @@ def render_backtest_metric_cards(metrics_df):
         ("Annualized volatility", "annualized_volatility", True),
         ("VaR 95", "VaR_95", False),
         ("CVaR 95", "CVaR_95", False),
-        ("Max drawdown", "max_drawdown", False),
+        ("Maximum Drawdown", "max_drawdown", False),
     ]
     cols = st.columns(len(metrics))
     for col, (label, column, negative_is_better) in zip(cols, metrics):
@@ -1037,7 +1130,7 @@ def render_backtest_metric_cards(metrics_df):
         with col:
             metric_card(
                 label,
-                format_pct(strategy_value) if strategy_value is not None else "N/D",
+                format_pct(strategy_value) if strategy_value is not None else "N/A",
                 metric_delta_note(
                     buy_hold_value,
                     strategy_value,
@@ -1063,34 +1156,34 @@ def render_defensive_reading(metrics_df):
     return_delta = float(strategy["total_return"] - buy_hold["total_return"])
 
     vol_text = (
-        f"reduce volatilidad anualizada en {abs(vol_delta):.2%}"
+        f"reduces annualised volatility by {abs(vol_delta):.2%}"
         if vol_delta < 0
-        else f"aumenta volatilidad anualizada en {abs(vol_delta):.2%}"
+        else f"increases annualised volatility by {abs(vol_delta):.2%}"
     )
     cvar_text = (
-        f"hace el CVaR menos severo en {abs(cvar_delta):.2%}"
+        f"makes CVaR less severe by {abs(cvar_delta):.2%}"
         if cvar_delta > 0
-        else f"hace el CVaR más severo en {abs(cvar_delta):.2%}"
+        else f"makes CVaR more severe by {abs(cvar_delta):.2%}"
     )
     drawdown_text = (
-        f"hace el drawdown máximo menos severo en {abs(drawdown_delta):.2%}"
+        f"makes maximum drawdown less severe by {abs(drawdown_delta):.2%}"
         if drawdown_delta > 0
-        else f"hace el drawdown máximo más severo en {abs(drawdown_delta):.2%}"
+        else f"makes maximum drawdown more severe by {abs(drawdown_delta):.2%}"
     )
     return_text = (
-        f"con un retorno acumulado superior en {abs(return_delta):.2%}"
+        f"with a higher cumulative return of {abs(return_delta):.2%}"
         if return_delta > 0
-        else f"con un sacrificio de retorno acumulado de {abs(return_delta):.2%}"
+        else f"with a cumulative return reduction of {abs(return_delta):.2%}"
     )
 
     st.markdown(
         f"""
         <div class="panel-box">
-            <div class="regime-card-title">Lectura defensiva</div>
+            <div class="regime-card-title">Defensive Interpretation</div>
             <div class="regime-card-detail">
-                La estrategia adaptativa {vol_text}, {cvar_text} y {drawdown_text},
-                {return_text}. No se interpreta como una señal de mercado, sino como
-                una regla defensiva de reducción de exposición ante regímenes de mayor vulnerabilidad.
+                The adaptive strategy {vol_text}, {cvar_text} and {drawdown_text},
+                {return_text}. This is a defensive exposure rule for vulnerable regimes,
+                rather than a market timing signal.
             </div>
         </div>
         """,
@@ -1100,7 +1193,7 @@ def render_defensive_reading(metrics_df):
 
 def render_backtest_line_chart(backtest_df, columns, labels, title, ylabel):
     if backtest_df.empty:
-        st.info(f"No hay datos para visualizar {title.lower()}.")
+        st.info(f"No data is available to display {title.lower()}.")
         return
     fig, ax = plt.subplots(figsize=(10, 3.4))
     colors = ["#d6c2a8", "#7f8f7a", "#be5a54"]
@@ -1117,7 +1210,7 @@ def render_backtest_line_chart(backtest_df, columns, labels, title, ylabel):
 
 def render_backtest_exposure(backtest_df):
     if backtest_df.empty:
-        st.info("No hay datos para visualizar la exposición adaptativa.")
+        st.info("No adaptive exposure data is available.")
         return
     fig, ax = plt.subplots(figsize=(10, 2.8))
     ax.step(
@@ -1130,7 +1223,7 @@ def render_backtest_exposure(backtest_df):
     )
     ax.set_yticks([0.25, 0.75, 1.0])
     ax.set_ylim(0.15, 1.05)
-    ax.set_ylabel("Exposición")
+    ax.set_ylabel("Exposure")
     ax.legend(facecolor="#171717", edgecolor="#4a4035", labelcolor="#ddd4c9")
     style_regime_axis(ax)
     fig.autofmt_xdate()
@@ -1141,20 +1234,20 @@ def render_backtest_exposure(backtest_df):
 
 def render_backtest_latest(latest_payload):
     if not latest_payload:
-        st.info("No hay estado latest de backtesting disponible.")
+        st.info("No evaluated backtest session is available.")
         return
     st.markdown(
         f"""
         <div class="panel-box">
-            <div class="regime-card-title">Estado actual del backtest</div>
-            <div class="regime-card-label">{latest_payload.get("regime_label", "N/D")}</div>
+            <div class="regime-card-title">Last Evaluated Backtest Session</div>
+            <div class="regime-card-label">{risk_label(latest_payload.get("regime_label"))}</div>
             <div class="regime-card-detail">
-                Fecha: <b>{latest_payload.get("date", "N/D")}</b><br>
-                Exposición aplicada: <b>{float(latest_payload.get("strategy_exposure", 0.0)):.2f}</b><br>
-                Exposición objetivo: <b>{float(latest_payload.get("target_exposure", 0.0)):.2f}</b><br>
-                Buy & Hold acumulado: <b>{float(latest_payload.get("benchmark_cum", 0.0)):.2f}x</b><br>
-                Estrategia acumulada: <b>{float(latest_payload.get("strategy_cum", 0.0)):.2f}x</b><br>
-                Drawdown estrategia: <b>{float(latest_payload.get("strategy_drawdown", 0.0)):.2%}</b>
+                Date: <b>{latest_payload.get("date", "N/A")}</b><br>
+                Applied Exposure: <b>{float(latest_payload.get("strategy_exposure", 0.0)):.2f}</b><br>
+                Target Portfolio Exposure: <b>{float(latest_payload.get("target_exposure", 0.0)):.2f}</b><br>
+                Buy & Hold Cumulative Growth: <b>{float(latest_payload.get("benchmark_cum", 0.0)):.2f}x</b><br>
+                Strategy Cumulative Growth: <b>{float(latest_payload.get("strategy_cum", 0.0)):.2f}x</b><br>
+                Strategy Drawdown: <b>{float(latest_payload.get("strategy_drawdown", 0.0)):.2%}</b>
             </div>
             <div class="uncertainty-note">
                 {latest_payload.get("methodology", "")}
@@ -1200,24 +1293,24 @@ def tail_metric_value(metrics_df, strategy, column):
 
 def tail_severity_note(buy_hold_value, strategy_value, label, lower_is_better=False):
     if buy_hold_value is None or strategy_value is None:
-        return "Comparación no disponible."
+        return "Comparison unavailable."
     delta = strategy_value - buy_hold_value
     if lower_is_better:
         if delta < 0:
-            return f"Menor que Buy & Hold por {abs(delta):.2%}."
+            return f"Lower than Buy & Hold by {abs(delta):.2%}."
         if delta > 0:
-            return f"Mayor que Buy & Hold por {abs(delta):.2%}."
-        return "Sin diferencia frente a Buy & Hold."
+            return f"Higher than Buy & Hold by {abs(delta):.2%}."
+        return "No difference from Buy & Hold."
     if delta > 0:
-        return f"Menos severo que Buy & Hold por {abs(delta):.2%}."
+        return f"Less severe than Buy & Hold by {abs(delta):.2%}."
     if delta < 0:
-        return f"Más severo que Buy & Hold por {abs(delta):.2%}."
-    return "Sin diferencia frente a Buy & Hold."
+        return f"More severe than Buy & Hold by {abs(delta):.2%}."
+    return "No difference from Buy & Hold."
 
 
 def render_tail_metric_cards(threshold_payload, metrics_df):
     if not threshold_payload or metrics_df.empty:
-        st.info("No hay métricas de cola disponibles.")
+        st.info("No tail risk metrics are available.")
         return
     cvar_buy_hold = tail_metric_value(metrics_df, "Buy & Hold", "tail_CVaR_95")
     cvar_strategy = tail_metric_value(metrics_df, "Regime Strategy", "tail_CVaR_95")
@@ -1226,32 +1319,32 @@ def render_tail_metric_cards(threshold_payload, metrics_df):
         (
             "Tail threshold",
             format_pct(threshold_payload.get("tail_threshold", 0.0)),
-            "Umbral del peor 5% OOS.",
+            "Threshold for the worst 5% of Out-of-Sample sessions.",
         ),
         (
-            "Eventos extremos",
+            "Extreme Events",
             str(int(threshold_payload.get("n_tail_events", 0))),
-            "Sesiones clasificadas como cola izquierda.",
+            "Sessions classified as left tail events.",
         ),
         (
             "Tail share",
             format_pct(threshold_payload.get("tail_share", 0.0)),
-            "Proporción OOS bajo el threshold.",
+            "Out-of-Sample share below the threshold.",
         ),
         (
             "Worst market return",
             format_pct(threshold_payload.get("worst_market_return", 0.0)),
-            "Peor retorno diario de mercado.",
+            "Worst daily market return.",
         ),
         (
-            "CVaR cola Buy & Hold",
-            format_pct(cvar_buy_hold) if cvar_buy_hold is not None else "N/D",
-            "Severidad media en la cola.",
+            "Tail CVaR Buy & Hold",
+            format_pct(cvar_buy_hold) if cvar_buy_hold is not None else "N/A",
+            "Average tail loss severity.",
         ),
         (
-            "CVaR cola Regime Strategy",
-            format_pct(cvar_strategy) if cvar_strategy is not None else "N/D",
-            tail_severity_note(cvar_buy_hold, cvar_strategy, "CVaR cola"),
+            "Tail CVaR Regime Strategy",
+            format_pct(cvar_strategy) if cvar_strategy is not None else "N/A",
+            tail_severity_note(cvar_buy_hold, cvar_strategy, "Tail CVaR"),
         ),
     ]
     cols = st.columns(3)
@@ -1264,11 +1357,11 @@ def render_tail_defensive_reading(metrics_df):
     if metrics_df.empty:
         return
     comparisons = [
-        ("mean_tail_return", "retorno medio de cola", False),
-        ("tail_volatility", "volatilidad de cola", True),
-        ("tail_CVaR_95", "CVaR de cola", False),
-        ("tail_total_return", "acumulado en días tail", False),
-        ("max_backtest_drawdown_on_tail_days", "drawdown observado en días tail", False),
+        ("mean_tail_return", "Mean Tail Return", False),
+        ("tail_volatility", "Tail Volatility", True),
+        ("tail_CVaR_95", "Tail CVaR", False),
+        ("tail_total_return", "Cumulative Return on Tail Sessions", False),
+        ("max_backtest_drawdown_on_tail_days", "Drawdown Observed on Tail Sessions", False),
     ]
     fragments = []
     for column, label, lower_is_better in comparisons:
@@ -1281,11 +1374,11 @@ def render_tail_defensive_reading(metrics_df):
     st.markdown(
         f"""
         <div class="panel-box">
-            <div class="regime-card-title">Comparación defensiva en cola</div>
+            <div class="regime-card-title">Defensive Tail Risk Comparison</div>
             <div class="regime-card-detail">
-                La comparación se realiza sobre los mismos días extremos del mercado.
-                Por tanto, la diferencia entre estrategias refleja cómo la reducción de exposición
-                modifica la severidad de pérdidas durante episodios de cola izquierda.<br><br>
+                Both strategies are compared on the same extreme market sessions.
+                Differences between strategies show how reduced exposure
+                affects loss severity during left tail events.<br><br>
                 {'<br>'.join(fragments)}
             </div>
         </div>
@@ -1296,7 +1389,7 @@ def render_tail_defensive_reading(metrics_df):
 
 def render_tail_event_timeline(tail_df, threshold):
     if tail_df.empty:
-        st.info("No hay eventos de cola disponibles.")
+        st.info("No tail events are available.")
         return
     fig, ax = plt.subplots(figsize=(10, 3.4))
     ax.plot(
@@ -1305,7 +1398,7 @@ def render_tail_event_timeline(tail_df, threshold):
         linewidth=1.0,
         color="#8d8479",
         alpha=0.65,
-        label="ret_1d",
+        label="Daily Market Return",
     )
     tail_days = tail_df[tail_df["stress_tail_event"]]
     ax.scatter(
@@ -1314,7 +1407,7 @@ def render_tail_event_timeline(tail_df, threshold):
         color="#be5a54",
         s=28,
         alpha=0.95,
-        label="Evento extremo",
+        label="Extreme Event",
         zorder=3,
     )
     ax.axhline(float(threshold), color="#d6c2a8", linestyle="--", linewidth=1.2, label="Tail threshold")
@@ -1329,11 +1422,11 @@ def render_tail_event_timeline(tail_df, threshold):
 
 def render_tail_cumulative_chart(tail_df):
     if tail_df.empty:
-        st.info("No hay datos para visualizar acumulados de cola.")
+        st.info("No cumulative tail return data is available.")
         return
     tail_only_df = tail_df[tail_df["stress_tail_event"]].copy()
     if tail_only_df.empty:
-        st.info("No hay días tail para visualizar acumulados.")
+        st.info("No tail sessions are available for cumulative returns.")
         return
     fig, ax = plt.subplots(figsize=(10, 3.4))
     ax.plot(
@@ -1361,7 +1454,7 @@ def render_tail_cumulative_chart(tail_df):
 
 def render_tail_cvar_bars(metrics_df):
     if metrics_df.empty:
-        st.info("No hay CVaR de cola disponible.")
+        st.info("No tail CVaR data is available.")
         return
     labels = ["Buy & Hold", "Regime Strategy"]
     values = [
@@ -1379,16 +1472,16 @@ def render_tail_cvar_bars(metrics_df):
 
 def render_tail_regime_composition(tail_df):
     if tail_df.empty:
-        st.info("No hay composición de regímenes disponible.")
+        st.info("No regime composition data is available.")
         return
     tail_only_df = tail_df[tail_df["stress_tail_event"]]
     if tail_only_df.empty:
-        st.info("No hay días tail para contar regímenes.")
+        st.info("No tail sessions are available for regime counts.")
         return
     counts = tail_only_df["regime_label"].value_counts()
     fig, ax = plt.subplots(figsize=(6.5, 3.2))
-    ax.bar(counts.index.tolist(), counts.values.tolist(), color="#d6c2a8")
-    ax.set_ylabel("Número de sesiones")
+    ax.bar([risk_label(label) for label in counts.index], counts.values.tolist(), color="#d6c2a8")
+    ax.set_ylabel("Number of Sessions")
     style_regime_axis(ax)
     fig.tight_layout()
     st.pyplot(fig, use_container_width=True)
@@ -1397,24 +1490,24 @@ def render_tail_regime_composition(tail_df):
 
 def render_tail_latest(latest_payload):
     if not latest_payload:
-        st.info("No hay estado latest de Tail Risk disponible.")
+        st.info("No evaluated tail risk session is available.")
         return
     is_tail = bool(latest_payload.get("stress_tail_event", False))
     tail_message = (
-        "La última sesión sí pertenece al conjunto de eventos extremos."
+        "The last evaluated session is an extreme event."
         if is_tail
-        else "La última sesión no pertenece al peor 5% OOS."
+        else "The last evaluated session is outside the worst 5% of Out-of-Sample sessions."
     )
     st.markdown(
         f"""
         <div class="panel-box">
-            <div class="regime-card-title">Última sesión evaluada</div>
-            <div class="regime-card-label">{latest_payload.get("regime_label", "N/D")}</div>
+            <div class="regime-card-title">Last Evaluated Session</div>
+            <div class="regime-card-label">{risk_label(latest_payload.get("regime_label"))}</div>
             <div class="regime-card-detail">
-                Fecha: <b>{latest_payload.get("date", "N/D")}</b><br>
-                Retorno mercado: <b>{float(latest_payload.get("ret_1d", 0.0)):.2%}</b><br>
+                Date: <b>{latest_payload.get("date", "N/A")}</b><br>
+                Market Return: <b>{float(latest_payload.get("ret_1d", 0.0)):.2%}</b><br>
                 Tail threshold: <b>{float(latest_payload.get("tail_threshold", 0.0)):.2%}</b><br>
-                Exposición aplicada: <b>{float(latest_payload.get("strategy_exposure", 0.0)):.2f}</b><br>
+                Applied Exposure: <b>{float(latest_payload.get("strategy_exposure", 0.0)):.2f}</b><br>
                 Buy & Hold return: <b>{float(latest_payload.get("benchmark_return", 0.0)):.2%}</b><br>
                 Regime Strategy return: <b>{float(latest_payload.get("strategy_return", 0.0)):.2%}</b><br>
                 <b>{tail_message}</b>
@@ -1437,197 +1530,218 @@ if enter != "1":
 left_btn, right_btn = st.columns([1, 6])
 
 with left_btn:
-    if st.button("Inicio"):
+    if st.button("Home"):
         st.query_params.clear()
         st.rerun()
 
 with right_btn:
-    if st.button("Actualizar datos"):
-        with st.spinner("Actualizando datos..."):
+    if st.button("Update Market Data"):
+        with st.spinner("Updating data..."):
             try:
                 response = requests.post(f"{API_URL}/run-update", timeout=320)
                 response.raise_for_status()
                 update_result = response.json()
             except Exception as e:
-                st.error("No se pudo actualizar el sistema.")
-                if getattr(e, "response", None) is not None:
-                    try:
-                        error_payload = e.response.json()
-                        st.code(error_payload.get("stderr") or error_payload.get("message") or str(error_payload))
-                    except Exception:
-                        st.code(e.response.text)
-                else:
-                    st.code(str(e))
+                st.error("The system update failed.")
+                st.caption("Check the API service logs for technical details.")
             else:
-                st.success("Datos actualizados correctamente.")
+                st.success("Data updated successfully.")
                 st.cache_data.clear()
                 st.rerun()
 
+data = None
 try:
     data = load_latest_data()
+except requests.HTTPError as exc:
+    if exc.response is not None and exc.response.status_code == 503:
+        st.warning("No usable operational MAIN publication is available from FastAPI.")
+    else:
+        st.warning("FastAPI could not return operational results.")
+except (requests.RequestException, ValueError):
+    st.warning(f"FastAPI is unavailable or returned an invalid response. API: {API_URL}")
+
+try:
     df = load_historical_data()
-except Exception as e:
-    st.markdown(
-        f"""
-        <div class="panel-box">
-            <h2>Error de conexión</h2>
-            <p>No se pudieron recuperar los datos desde la API configurada. Comprueba que FastAPI esté funcionando en {API_URL}.</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.exception(e)
-    st.stop()
+except (requests.RequestException, ValueError, KeyError):
+    df = pd.DataFrame()
+    st.warning("Market history is unavailable; other views remain available.")
 
 st.markdown(
     f"""
     <div class="topbar">
         <div class="topbar-title">RISKBEX</div>
         <div class="topbar-subtitle">
-            Monitor interpretable de riesgo extremo del IBEX 35 · Última actualización disponible: <b>{data['date']}</b>
+            IBEX 35 Risk Intelligence · Publication Information Date: <b>{data['date'] if data else 'N/A'}</b>
         </div>
     </div>
     """,
     unsafe_allow_html=True,
 )
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-    [
-        "Visión general",
-        "Análisis histórico",
-        "Figuras de investigación",
-        "Regímenes",
-        "Backtesting adaptativo",
-        "Riesgo de cola",
-    ]
-)
+pages = ["Monitor", "Explore", "Results", "Models", "Research", "Tail Risk"]
+requested_page = st.query_params.get("view", "Monitor")
+tab_options = {}
+if "default" in inspect.signature(st.tabs).parameters:
+    tab_options["default"] = requested_page if requested_page in pages else "Monitor"
+sections = dict(zip(pages, st.tabs(pages, **tab_options)))
 
-with tab1:
-    st.markdown('<div class="section-title">Estado actual del mercado</div>', unsafe_allow_html=True)
-    risk_level_text = str(data.get("risk_level", "")).capitalize() if data.get("risk_level") else "N/D"
+with sections["Monitor"]:
+    if data:
+        render_operational_overview(data)
+        st.caption("Published Session Risk Metrics")
+        for col, key, label in zip(st.columns(3), ["cvar_95_60d", "drawdown", "vol_20d"],
+                                  ["Expected Shortfall (CVaR) · 95%, 60 Sessions", "Drawdown", "20-Session Volatility"]):
+            item = data.get(key)
+            col.metric(label, f"{item:.2%}" if item is not None else "N/A")
+    if data and data.get("publication") and not df.empty:
+        monitor_history = df[df.date <= pd.Timestamp(data["date"])]
+        st.caption("Recent published history · the final observation may be stale; see Data Freshness above.")
+        render_price_regimes(monitor_history.tail(90))
+    if data and data.get("risk_score") is not None:
+        with st.expander("Legacy descriptive indicator · historical reference"):
+            st.markdown('<div class="section-title">Historical Market State</div>', unsafe_allow_html=True)
+            risk_level_text = str(data.get("risk_level", "")).capitalize() if data.get("risk_level") else "N/A"
 
-    regime_cols = st.columns([20, 1])
-    with regime_cols[0]:
-        render_status_box(data["regime_label"], data["risk_score"])
-    with regime_cols[1]:
-        info_popover(
-            "Régimen de mercado",
-            "El régimen resume el estado actual del mercado en una categoría interpretable. En esta versión del sistema se usa para distinguir entre entornos de calma, turbulencia y estrés."
-        )
+            regime_cols = st.columns([20, 1])
+            with regime_cols[0]:
+                render_status_box(data["regime_label"], data["risk_score"])
+            with regime_cols[1]:
+                info_popover(
+                    "Market Regime",
+                    "The regime groups market conditions into interpretable Low Risk, Medium Risk and High Risk states."
+                )
 
-    metric_labels = [
-        "CVaR 95% (60d)",
-        "Drawdown",
-        "Volatilidad 20d",
-        "Nivel de riesgo",
-    ]
-    metric_values = [
-        f"{data['cvar_95_60d']:.2%}",
-        f"{data['drawdown']:.2%}",
-        f"{data['vol_20d']:.2%}",
-        f"{int(data['risk_score'])} / 100 · {risk_level_text}",
-    ]
-    metric_notes = [
-        "Pérdida esperada en escenarios adversos.",
-        "Caída respecto al último máximo.",
-        "Variabilidad reciente del mercado.",
-        "Síntesis agregada del entorno de riesgo.",
-    ]
-    metric_infos = [
-        (
-            "CVaR",
-            "El Conditional Value at Risk mide la pérdida media esperada en la cola de la distribución, una vez superado el umbral de VaR. Es una medida útil para evaluar riesgo extremo."
-        ),
-        (
-            "Drawdown",
-            "El drawdown captura cuánto ha caído el mercado desde su máximo reciente. Ayuda a visualizar deterioros acumulados y episodios de pérdida persistente."
-        ),
-        (
-            "Volatilidad 20 días",
-            "La volatilidad a 20 días resume la variabilidad reciente de los rendimientos. Valores más altos suelen indicar un entorno más incierto e inestable."
-        ),
-        (
-            "Nivel de riesgo",
-            "El indicador de riesgo mide la posición relativa histórica del riesgo de mercado en escala 0-100 usando percentiles históricos expanding. Combina EWMA volatility, CVaR, drawdown y downside volatility. Un valor 0 representa riesgo relativo bajo y 100 riesgo extremo relativo. No predice retornos ni constituye señal de compra o venta."
-        ),
-    ]
+            metric_labels = [
+                "Expected Shortfall (CVaR) · 95%, 60 Sessions",
+                "Drawdown",
+                "20-Session Volatility",
+                "Relative Risk Score",
+            ]
+            metric_values = [
+                f"{data['cvar_95_60d']:.2%}",
+                f"{data['drawdown']:.2%}",
+                f"{data['vol_20d']:.2%}",
+                f"{int(data['risk_score'])} / 100 · {risk_level_text}",
+            ]
+            metric_notes = [
+                "Expected loss in adverse scenarios.",
+                "Decline from the latest peak.",
+                "Recent market variability.",
+                "Aggregate relative risk conditions.",
+            ]
+            metric_infos = [
+                (
+                    "CVaR",
+                    "Expected Shortfall (CVaR) measures average tail loss beyond the VaR threshold."
+                ),
+                (
+                    "Drawdown",
+                    "Drawdown measures the decline from the recent market peak and shows persistent losses."
+                ),
+                (
+                    "20-Session Volatility",
+                    "20-session volatility measures recent return variability. Higher values indicate greater instability."
+                ),
+                (
+                    "Relative Risk Score",
+                    "The legacy score uses expanding historical percentiles of EWMA volatility, CVaR, drawdown and downside volatility. Values range from 0 (low relative risk) to 100 (extreme relative risk). It does not forecast returns or provide trading signals."
+                ),
+            ]
 
-    cols = st.columns(4)
-    for i, col in enumerate(cols):
-        with col:
-            inner_left, inner_right = st.columns([8, 1])
-            with inner_left:
-                metric_card(metric_labels[i], metric_values[i], metric_notes[i])
-            with inner_right:
-                info_popover(metric_infos[i][0], metric_infos[i][1])
+            cols = st.columns(4)
+            for i, col in enumerate(cols):
+                with col:
+                    inner_left, inner_right = st.columns([8, 1])
+                    with inner_left:
+                        metric_card(metric_labels[i], metric_values[i], metric_notes[i])
+                    with inner_right:
+                        info_popover(metric_infos[i][0], metric_infos[i][1])
 
-    panel_header(
-        "Cómo leer este dashboard",
-        "Interpretación general",
-        "Esta vista resume el estado actual del mercado mediante un régimen y un indicador agregado de riesgo relativo histórico (0-100). Cuanto mayor es el indicador, más extremo es el entorno de riesgo frente a su propia historia."
-    )
+            panel_header(
+                "How to Read This View",
+                "Interpretation",
+                "This legacy view summarises relative historical risk on a 0–100 scale. Higher values indicate more extreme conditions relative to prior observations."
+            )
 
-    if data["risk_score"] > 70:
-        st.warning("El entorno actual es consistente con una fase de riesgo elevado.")
-    elif data["risk_score"] > 40:
-        st.info("El mercado muestra un nivel intermedio de riesgo y señales de inestabilidad.")
-    else:
-        st.success("El entorno actual sigue siendo relativamente contenido en términos de riesgo.")
+            if data["risk_score"] > 70:
+                st.warning("The evaluated session indicates elevated relative risk.")
+            elif data["risk_score"] > 40:
+                st.info("The evaluated session indicates moderate risk and instability.")
+            else:
+                st.success("The evaluated session indicates relatively contained risk.")
 
-    st.progress(max(0.0, min(float(data["risk_score"]) / 100, 1.0)))
-    st.caption("Intensidad actual del indicador agregado de riesgo.")
+            st.progress(max(0.0, min(float(data["risk_score"]) / 100, 1.0)))
+            st.caption("Relative historical score intensity.")
 
-with tab2:
+with sections["Explore"]:
+    st.info("Historical MAIN publication data; this history is not a current signal.")
+    df = select_period(df, "explore_period")
+    explore_signals = prepare_regime_history(fetch_regime_endpoint_safe(
+        "/regimes/history?split=MAIN&limit=all", [], "MAIN regime history"))
+    if not explore_signals.empty and not df.empty:
+        explore_signals = explore_signals[explore_signals["date"].between(df.date.min(), df.date.max())]
+    render_price_regimes(df)
+    if not explore_signals.empty:
+        st.subheader("Historical Regime Probabilities")
+        st.area_chart(explore_signals.set_index("date")[["p_regime_0", "p_regime_1", "p_regime_2"]]
+                      .rename(columns={f"p_regime_{i}": f"Regime {i}" for i in range(3)}))
+    exposure = prepare_backtest_results(fetch_backtesting_endpoint_safe(
+        "/backtesting/results?sample=main", [], "MAIN exposure history"))
+    if not exposure.empty and not df.empty:
+        exposure = exposure[exposure.date.between(df.date.min(), df.date.max())]
+        st.subheader("Adaptive Portfolio Exposure")
+        st.line_chart(exposure.set_index("date")[["strategy_exposure", "target_exposure"]]
+                      .rename(columns={"strategy_exposure": "Applied Exposure", "target_exposure": "Target Portfolio Exposure"}))
     historical_metric_options = [
         {
-            "label": "Nivel de riesgo",
+            "label": "Relative Risk Score",
             "column": "risk_score",
-            "title": "Evolución del nivel de riesgo",
-            "info_title": "Nivel de riesgo histórico",
-            "info_text": "Este gráfico muestra la trayectoria histórica del indicador agregado de riesgo. Permite identificar fases de deterioro, normalización y persistencia del estrés.",
-            "caption": "Trayectoria histórica del indicador agregado de riesgo.",
+            "title": "Historical Relative Risk Score",
+            "info_title": "Historical Relative Risk Score",
+            "info_text": "Historical relative risk score showing deterioration, normalisation and persistent stress.",
+            "caption": "Historical relative risk score.",
         },
         {
-            "label": "CVaR 95% 60d",
+            "label": "Expected Shortfall (CVaR) · 95%, 60 Sessions",
             "column": "cvar_95_60d",
             "title": "CVaR (95%, 60d)",
-            "info_title": "CVaR histórico",
-            "info_text": "Este panel sigue la evolución del Conditional Value at Risk en ventana móvil. Cuanto más extremo sea su valor, más severas son las pérdidas esperadas en escenarios adversos.",
-            "caption": "Evolución del riesgo de cola.",
+            "info_title": "Historical Expected Shortfall (CVaR)",
+            "info_text": "Rolling Expected Shortfall (CVaR). More negative values indicate more severe average tail losses.",
+            "caption": "Historical tail risk.",
         },
         {
-            "label": "Volatilidad 20d",
+            "label": "20-Session Volatility",
             "column": "vol_20d",
-            "title": "Volatilidad (20d)",
-            "info_title": "Volatilidad histórica",
-            "info_text": "Esta serie recoge la volatilidad realizada a 20 días. Es una señal útil para seguir episodios de inestabilidad reciente.",
-            "caption": "Evolución de la variabilidad reciente del mercado.",
+            "title": "20-Session Volatility",
+            "info_title": "Historical Volatility",
+            "info_text": "Realised volatility over 20 trading sessions tracks recent market instability.",
+            "caption": "Historical market variability.",
         },
         {
             "label": "Drawdown",
             "column": "drawdown",
             "title": "Drawdown",
-            "info_title": "Drawdown histórico",
-            "info_text": "El drawdown permite seguir la profundidad de las caídas acumuladas respecto al máximo más reciente. Resulta especialmente útil para detectar fases de deterioro prolongado.",
-            "caption": "Pérdidas acumuladas respecto a máximos previos.",
+            "info_title": "Historical Drawdown",
+            "info_text": "Drawdown tracks cumulative losses from the most recent peak and highlights prolonged declines.",
+            "caption": "Cumulative losses from previous peaks.",
         },
         {
             "label": "Skewness",
             "column": "skew_60d",
-            "title": "Asimetría (60d)",
-            "info_title": "Asimetría histórica",
-            "info_text": "La asimetría muestra si la distribución de rendimientos tiene más peso hacia la cola izquierda o derecha. En episodios de estrés suelen aparecer sesgos más negativos.",
-            "caption": "Asimetría de la distribución de rendimientos.",
+            "title": "Skewness (60 Sessions)",
+            "info_title": "Historical Skewness",
+            "info_text": "Skewness describes the asymmetry of returns. Negative skewness indicates a heavier left tail.",
+            "caption": "Return distribution skewness.",
         },
     ]
 
     available_historical_metrics = [
-        metric for metric in historical_metric_options if metric["column"] in df.columns
+        metric for metric in historical_metric_options if metric["column"] in df.columns and df[metric["column"]].notna().any()
     ]
 
     if available_historical_metrics:
         selected_historical_label = st.radio(
-            "Serie histórica",
+            "Historical Metric",
             [metric["label"] for metric in available_historical_metrics],
             horizontal=True,
             key="historical_metric_selector",
@@ -1643,45 +1757,46 @@ with tab2:
             selected_historical_metric["info_text"],
         )
         st.line_chart(
-            df.set_index("date")[selected_historical_metric["column"]],
+            df.set_index("date")[[selected_historical_metric["column"]]].rename(columns={selected_historical_metric["column"]: selected_historical_metric["label"]}),
             use_container_width=True,
         )
         st.caption(selected_historical_metric["caption"])
     else:
-        st.warning("No hay series históricas disponibles para mostrar en esta sección.")
+        st.warning("No historical series are available in this view.")
 
-with tab3:
+with sections["Research"]:
+    st.info("Historical research and evaluation. MAIN versioned results shown here are historical. Consult Monitor for operational signals; ROBUST is an academic reference only.")
     figure_options = {
-        "Rendimientos diarios": {
+        "Daily Returns": {
             "path": FIGURES_DIR / "daily_returns_ibex35.png",
-            "info": "Representa la evolución diaria de los rendimientos del IBEX 35. Sirve para identificar episodios de alta variabilidad y cambios bruscos en la dinámica del mercado."
+            "info": "Daily IBEX 35 returns highlight volatility episodes and abrupt market changes."
         },
-        "Volatilidad vs downside (60d)": {
+        "Volatility vs Downside Volatility (60 Sessions)": {
             "path": FIGURES_DIR / "volatility_vs_downside_60d.png",
-            "info": "Compara la volatilidad total con una medida centrada en el riesgo a la baja. Es útil para ver si el deterioro viene principalmente por movimientos negativos."
+            "info": "Total volatility compared with downside volatility helps identify instability driven by negative returns."
         },
-        "VaR y CVaR (60d)": {
+        "VaR and CVaR (60 Sessions)": {
             "path": FIGURES_DIR / "var_cvar_60d.png",
-            "info": "Compara dos medidas de riesgo de cola. Si el CVaR se separa mucho del VaR, suele indicar que las pérdidas extremas son especialmente severas."
+            "info": "VaR and CVaR describe tail risk. A wide gap indicates particularly severe extreme losses."
         },
         "Drawdown": {
             "path": FIGURES_DIR / "drawdown_ibex35.png",
-            "info": "Muestra las caídas acumuladas del índice respecto a sus máximos previos. Ayuda a visualizar la profundidad y duración de los episodios bajistas."
+            "info": "Index losses from previous peaks show the depth and duration of market declines."
         },
-        "Asimetría (60d)": {
+        "Skewness (60 Sessions)": {
             "path": FIGURES_DIR / "skew_60d_series.png",
-            "info": "Permite seguir la evolución temporal de la asimetría de la distribución de rendimientos. Sesgos negativos persistentes pueden asociarse a entornos más frágiles."
+            "info": "Historical return skewness. Persistent negative skewness may indicate more fragile conditions."
         },
-        "Retorno ajustado por riesgo (60d)": {
+        "Risk-Adjusted Return (60 Sessions)": {
             "path": FIGURES_DIR / "ret_risk_60d_series.png",
-            "info": "Relaciona rendimiento y riesgo dentro de una ventana móvil. Ayuda a observar si las rentabilidades recientes compensan adecuadamente la volatilidad asumida."
+            "info": "Rolling risk-adjusted returns show how recent performance relates to realised volatility."
         },
     }
 
-    st.subheader("Figuras de investigación")
+    st.subheader("Research")
 
     selected_figure = st.radio(
-        "Figura",
+        "Figure",
         list(figure_options.keys()),
         horizontal=True,
         key="figure_selector",
@@ -1695,24 +1810,30 @@ with tab3:
 
         st.image(image_bytes, caption=selected_figure, use_container_width=True)
         st.caption(
-            f"Última modificación: {pd.to_datetime(selected_path.stat().st_mtime, unit='s')}"
+            f"Figure Last Modified: {pd.to_datetime(selected_path.stat().st_mtime, unit='s')}"
         )
     else:
-        st.warning(f"No se encontró la figura: {selected_path}")
+        st.warning(f"Research figure unavailable: {selected_path}")
 
-with tab4:
-    st.subheader("Regímenes Markov")
+with sections["Models"]:
+    st.info("Historical research and evaluation. MAIN versioned results shown here are historical. Consult Monitor for operational signals; ROBUST is an academic reference only.")
+    st.subheader("Models")
+    st.markdown("**Markov** estimates the Current Market Regime using filtered probabilities. "
+                "**XGBoost** provides the Next-Session Regime Forecast. "
+                "**Expected Shortfall (CVaR)** measures average loss beyond the VaR threshold. "
+                "Model Confidence describes probability concentration, not guaranteed accuracy.")
+    st.subheader("Markov Regimes")
 
     if hasattr(st, "segmented_control"):
         split_selected = st.segmented_control(
-            "Selector de partición",
+            "Evaluation Split",
             ["MAIN", "ROBUST"],
             default="MAIN",
             key="regime_split_selector",
         )
     else:
         split_selected = st.radio(
-            "Selector de partición",
+            "Evaluation Split",
             ["MAIN", "ROBUST"],
             horizontal=True,
             key="regime_split_selector",
@@ -1723,84 +1844,84 @@ with tab4:
     latest_selected = fetch_regime_endpoint_safe(
         f"/regimes/latest?split={split_selected}",
         {},
-        "el estado actual del régimen",
+        "the last evaluated regime",
     )
     history_120 = prepare_regime_history(
         fetch_regime_endpoint_safe(
             f"/regimes/history?split={split_selected}&limit=120",
             [],
-            "las probabilidades filtradas",
+            "filtered probabilities",
         )
     )
     history_250 = prepare_regime_history(
         fetch_regime_endpoint_safe(
             f"/regimes/history?split={split_selected}&limit=250",
             [],
-            "el histórico de regímenes",
+            "regime history",
         )
     )
     transitions_selected = fetch_regime_endpoint_safe(
         f"/regimes/transitions?split={split_selected}",
         [],
-        "la matriz de transición",
+        "the transition matrix",
     )
     durations_selected = fetch_regime_endpoint_safe(
         f"/regimes/durations?split={split_selected}&scope=FULL_FILTERED",
         [],
-        "las duraciones de régimen",
+        "regime duration",
     )
     summary_records = fetch_regime_endpoint_safe(
         "/regimes/summary",
         [],
-        "el resumen comparativo MAIN vs ROBUST",
+        "the MAIN vs ROBUST comparison",
     )
 
-    st.markdown('<div class="section-title">Estado actual del régimen</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Last Evaluated Regime</div>', unsafe_allow_html=True)
     render_regime_card(split_selected, latest_selected)
 
-    st.markdown('<div class="section-title">Probabilidades filtradas</div>', unsafe_allow_html=True)
-    st.caption("Probabilidades filtradas del modelo Markov Switching")
+    st.markdown('<div class="section-title">Filtered Probabilities</div>', unsafe_allow_html=True)
+    st.caption("Filtered Markov Switching probabilities")
     if history_120.empty:
-        st.info("No hay histórico de probabilidades disponible.")
+        st.info("No historical probabilities are available.")
     else:
         probability_df = history_120.set_index("date")[
             ["p_regime_0", "p_regime_1", "p_regime_2"]
         ]
-        st.area_chart(probability_df, use_container_width=True)
+        st.area_chart(probability_df.rename(columns={f"p_regime_{i}": f"Regime {i}" for i in range(3)}), use_container_width=True)
 
-    st.markdown('<div class="section-title">Histórico reciente de regímenes</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Recent Regime History</div>', unsafe_allow_html=True)
     if history_250.empty:
-        st.info("No hay histórico de regímenes disponible.")
+        st.info("No regime history is available.")
     else:
         render_regime_timeline(history_250)
 
-    st.markdown('<div class="section-title">Incertidumbre probabilística</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Model Confidence</div>', unsafe_allow_html=True)
     uncertainty_col, uncertainty_chart_col = st.columns([1, 2])
     with uncertainty_col:
         render_uncertainty_card(split_selected, latest_selected)
     with uncertainty_chart_col:
         render_uncertainty_chart(history_250)
         st.caption(
-            "Umbrales operativos: alta confianza desde 80%, confianza moderada entre 60% y 80%, y zona de transición por debajo de 60%."
+            "Descriptive confidence thresholds: high from 80%, moderate from 60% to 80%, and transition below 60%. These are not calibrated forecast accuracy estimates."
         )
 
     heatmap_col, duration_col = st.columns(2)
     with heatmap_col:
-        st.markdown('<div class="section-title">Heatmap de transición</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Transition Heatmap</div>', unsafe_allow_html=True)
         render_transition_heatmap(transitions_selected)
         st.caption(
-            "Las probabilidades diagonales elevadas reflejan persistencia de régimen."
+            "High diagonal transition probabilities indicate regime persistence."
         )
 
     with duration_col:
-        st.markdown('<div class="section-title">Persistencia / duraciones</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Regime Persistence / Duration</div>', unsafe_allow_html=True)
         render_duration_bars(durations_selected)
-        st.caption("Duración media de bloques consecutivos de régimen.")
+        st.caption("Average length of consecutive regime episodes in trading sessions.")
 
-    st.markdown('<div class="section-title">Comparación MAIN vs ROBUST</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">MAIN vs ROBUST Comparison</div>', unsafe_allow_html=True)
     summary_df = pd.DataFrame(summary_records)
     if summary_df.empty:
-        st.info("No hay resumen de regímenes disponible.")
+        st.info("No regime summary is available.")
     else:
         comparison_df = summary_df[
             [
@@ -1820,17 +1941,18 @@ with tab4:
         comparison_df["mean_cvar_95_60d"] = comparison_df["mean_cvar_95_60d"].map(
             lambda value: f"{float(value):.2%}"
         )
-        st.dataframe(comparison_df, use_container_width=True, hide_index=True)
+        st.dataframe(presentation_frame(comparison_df), use_container_width=True, hide_index=True)
 
-with tab5:
-    st.subheader("Backtesting adaptativo")
+with sections["Results"]:
+    st.info("Historical research and evaluation. MAIN versioned results shown here are historical. Consult Monitor for operational signals; ROBUST is an academic reference only.")
+    st.subheader("Historical Backtesting")
     st.markdown(
         """
         <div class="panel-box">
             <div class="regime-card-detail">
-                El backtesting adaptativo compara una exposición Buy & Hold totalmente invertida
-                frente a una estrategia que ajusta exposición según el régimen de riesgo identificado.
-                La exposición se aplica con un desplazamiento de un día, <b>shift(1)</b>, para evitar
+                Historical Backtesting compares a fully invested Buy & Hold benchmark
+                with a strategy that adjusts exposure to the identified risk regime.
+                Exposure is applied with a one-session lag, <b>shift(1)</b>, to avoid
                 look-ahead bias.
             </div>
         </div>
@@ -1840,14 +1962,14 @@ with tab5:
 
     if hasattr(st, "segmented_control"):
         backtest_sample_label = st.segmented_control(
-            "Selector de muestra",
+            "Evaluation Sample",
             ["MAIN", "ROBUST"],
             default="MAIN",
             key="backtesting_sample_selector",
         )
     else:
         backtest_sample_label = st.radio(
-            "Selector de muestra",
+            "Evaluation Sample",
             ["MAIN", "ROBUST"],
             horizontal=True,
             key="backtesting_sample_selector",
@@ -1860,59 +1982,59 @@ with tab5:
         fetch_backtesting_endpoint_safe(
             f"/backtesting/results?sample={backtest_sample}",
             [],
-            f"los resultados de backtesting {backtest_sample_label}",
+            f"backtest results for {backtest_sample_label}",
         )
     )
     backtest_metrics = prepare_backtest_metrics(
         fetch_backtesting_endpoint_safe(
             "/backtesting/metrics",
             [],
-            "las métricas de backtesting",
+            "backtesting metrics",
         ),
         backtest_sample_label,
     )
     backtest_latest = fetch_backtesting_endpoint_safe(
         f"/backtesting/latest?sample={backtest_sample}",
         {},
-        f"el último estado de backtesting {backtest_sample_label}",
+        f"the last evaluated backtest session for {backtest_sample_label}",
     )
 
-    st.markdown('<div class="section-title">Comparación defensiva OOS</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Out-of-Sample Evaluation</div>', unsafe_allow_html=True)
     render_backtest_metric_cards(backtest_metrics)
     render_defensive_reading(backtest_metrics)
 
-    st.markdown('<div class="section-title">Estado actual/latest</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Last Evaluated Historical Session</div>', unsafe_allow_html=True)
     render_backtest_latest(backtest_latest)
 
     chart_col_left, chart_col_right = st.columns(2)
     with chart_col_left:
-        st.markdown('<div class="section-title">Curvas acumuladas</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Cumulative Return Curves</div>', unsafe_allow_html=True)
         render_backtest_line_chart(
             backtest_results,
             ["benchmark_cum", "strategy_cum"],
             ["Buy & Hold", "Regime Strategy"],
-            "Curvas acumuladas",
-            "Crecimiento acumulado",
+            "Cumulative Return Curves",
+            "Cumulative Growth",
         )
     with chart_col_right:
-        st.markdown('<div class="section-title">Drawdown comparado</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Drawdown Comparison</div>', unsafe_allow_html=True)
         render_backtest_line_chart(
             backtest_results,
             ["benchmark_drawdown", "strategy_drawdown"],
             ["Buy & Hold", "Regime Strategy"],
-            "Drawdown comparado",
+            "Drawdown Comparison",
             "Drawdown",
         )
 
-    st.markdown('<div class="section-title">Exposición adaptativa aplicada</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Adaptive Portfolio Exposure</div>', unsafe_allow_html=True)
     render_backtest_exposure(backtest_results)
     st.caption(
-        "La estrategia reduce exposición a 0.75 o 0.25 cuando el régimen filtrado refleja mayor vulnerabilidad."
+        "The strategy reduces exposure to 0.75 or 0.25 when the filtered regime indicates greater vulnerability."
     )
 
-    st.markdown('<div class="section-title">Métricas de riesgo</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Risk Metrics</div>', unsafe_allow_html=True)
     if backtest_metrics.empty:
-        st.info("No hay tabla de métricas disponible para la muestra seleccionada.")
+        st.info("No metrics are available for the selected sample.")
     else:
         display_metrics = backtest_metrics.copy()
         for column in [
@@ -1927,24 +2049,25 @@ with tab5:
             display_metrics[column] = display_metrics[column].map(
                 lambda value: f"{float(value):.2%}"
             )
-        st.dataframe(display_metrics, use_container_width=True, hide_index=True)
+        st.dataframe(presentation_frame(display_metrics), use_container_width=True, hide_index=True)
 
-    with st.expander("Ver datos OOS del backtest"):
+    with st.expander("View Out-of-Sample Backtest Data"):
         if backtest_results.empty:
-            st.info("No hay datos crudos disponibles para mostrar.")
+            st.info("No raw backtest data is available.")
         else:
-            st.dataframe(backtest_results.tail(250), use_container_width=True, hide_index=True)
+            st.dataframe(presentation_frame(backtest_results.tail(250)), use_container_width=True, hide_index=True)
 
-with tab6:
-    st.subheader("Riesgo de cola")
+with sections["Tail Risk"]:
+    st.info("Historical research and evaluation. MAIN versioned results shown here are historical. Consult Monitor for operational signals; ROBUST is an academic reference only.")
+    st.subheader("Tail Risk")
     st.markdown(
         """
         <div class="panel-box">
             <div class="regime-card-detail">
-                El análisis de riesgo de cola evalúa el comportamiento de Buy & Hold y de la
-                estrategia adaptativa durante el peor 5% de sesiones OOS del mercado.
-                Los eventos extremos se definen sobre <b>ret_1d</b>, no sobre los retornos
-                de cada estrategia, para comparar ambas reglas en los mismos días de estrés.
+                Tail risk analysis evaluates Buy & Hold and the
+                adaptive strategy during the worst 5% of Out-of-Sample market sessions.
+                Extreme events are defined using market returns (<b>ret_1d</b>), so both
+                strategies are evaluated on the same stressed sessions.
             </div>
         </div>
         """,
@@ -1953,14 +2076,14 @@ with tab6:
 
     if hasattr(st, "segmented_control"):
         tail_sample_label = st.segmented_control(
-            "Selector de muestra",
+            "Evaluation Sample",
             ["MAIN", "ROBUST"],
             default="MAIN",
             key="tail_sample_selector",
         )
     else:
         tail_sample_label = st.radio(
-            "Selector de muestra",
+            "Evaluation Sample",
             ["MAIN", "ROBUST"],
             horizontal=True,
             key="tail_sample_selector",
@@ -1973,14 +2096,14 @@ with tab6:
         fetch_tail_endpoint_safe(
             f"/tail-risk/events?sample={tail_sample}",
             [],
-            f"los eventos de cola {tail_sample_label}",
+            f"tail events for {tail_sample_label}",
         )
     )
     tail_metrics = prepare_tail_metrics(
         fetch_tail_endpoint_safe(
             "/tail-risk/metrics",
             [],
-            "las métricas de Tail Risk",
+            "tail risk metrics",
         ),
         tail_sample_label,
     )
@@ -1988,17 +2111,17 @@ with tab6:
         fetch_tail_endpoint_safe(
             "/tail-risk/thresholds",
             [],
-            "los thresholds de Tail Risk",
+            "tail risk thresholds",
         ),
         tail_sample_label,
     )
     tail_latest = fetch_tail_endpoint_safe(
         f"/tail-risk/latest?sample={tail_sample}",
         {},
-        f"el último estado de Tail Risk {tail_sample_label}",
+        f"the last evaluated tail risk session for {tail_sample_label}",
     )
 
-    st.markdown('<div class="section-title">Monitor de cola izquierda</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Left Tail Risk Evaluation</div>', unsafe_allow_html=True)
     render_tail_metric_cards(tail_threshold, tail_metrics)
     render_tail_defensive_reading(tail_metrics)
 
@@ -2007,29 +2130,29 @@ with tab6:
 
     timeline_col, tail_cum_col = st.columns(2)
     with timeline_col:
-        st.markdown('<div class="section-title">Timeline de eventos extremos</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Extreme Event Timeline</div>', unsafe_allow_html=True)
         render_tail_event_timeline(
             tail_events,
             tail_threshold.get("tail_threshold", 0.0) if tail_threshold else 0.0,
         )
     with tail_cum_col:
-        st.markdown('<div class="section-title">Acumulado en días tail</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Cumulative Return on Tail Sessions</div>', unsafe_allow_html=True)
         render_tail_cumulative_chart(tail_events)
 
     cvar_col, regime_col = st.columns(2)
     with cvar_col:
-        st.markdown('<div class="section-title">CVaR de cola</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-title">Tail CVaR</div>', unsafe_allow_html=True)
         render_tail_cvar_bars(tail_metrics)
     with regime_col:
         st.markdown(
-            '<div class="section-title">Composición de regímenes en estrés</div>',
+            '<div class="section-title">Regime Composition During Stress</div>',
             unsafe_allow_html=True,
         )
         render_tail_regime_composition(tail_events)
 
-    st.markdown('<div class="section-title">Métricas tail</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Tail Risk Metrics</div>', unsafe_allow_html=True)
     if tail_metrics.empty:
-        st.info("No hay tabla de métricas tail disponible para la muestra seleccionada.")
+        st.info("No tail risk metrics are available for the selected sample.")
     else:
         display_tail_metrics = tail_metrics[
             [
@@ -2056,11 +2179,11 @@ with tab6:
             display_tail_metrics[column] = display_tail_metrics[column].map(
                 lambda value: f"{float(value):.2%}"
             )
-        st.dataframe(display_tail_metrics, use_container_width=True, hide_index=True)
+        st.dataframe(presentation_frame(display_tail_metrics), use_container_width=True, hide_index=True)
 
-    st.markdown('<div class="section-title">Peores sesiones</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Worst Sessions</div>', unsafe_allow_html=True)
     if tail_events.empty:
-        st.info("No hay sesiones disponibles para mostrar.")
+        st.info("No sessions are available.")
     else:
         worst_days = tail_events.sort_values("ret_1d", ascending=True).head(10)
         worst_days = worst_days[
@@ -2088,12 +2211,12 @@ with tab6:
             lambda value: f"{float(value):.2f}"
         )
         worst_days["date"] = worst_days["date"].dt.strftime("%Y-%m-%d")
-        st.dataframe(worst_days, use_container_width=True, hide_index=True)
+        st.dataframe(presentation_frame(worst_days), use_container_width=True, hide_index=True)
 
 st.markdown(
     """
     <div class="footer-note">
-        RISKBEX conecta datos de mercado, métricas de riesgo y análisis de régimen para monitorizar el riesgo extremo del IBEX 35.
+        RISKBEX connects market data, risk metrics and regime analysis to monitor IBEX 35 tail risk.
     </div>
     """,
     unsafe_allow_html=True,
