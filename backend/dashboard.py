@@ -595,7 +595,10 @@ def render_status_box(regime_label: str, risk_score: float):
 def load_latest_data():
     response = requests.get(f"{API_URL}/latest-risk", timeout=10)
     response.raise_for_status()
-    return response.json()
+    data = response.json()
+    if not isinstance(data, dict) or not data.get("publication") or not data.get("signal"):
+        raise ValueError("The API did not return a validated operational publication.")
+    return data
 
 
 def risk_label(value):
@@ -668,7 +671,7 @@ def render_operational_overview(data):
     cols = st.columns(3)
     close = (signal.get("market") or {}).get("ibex_close")
     cols[0].metric("Last Market Close · IBEX 35", f"{close:,.2f}" if close is not None else "N/A")
-    cols[1].metric("Effective Information Date", value(signal.get("signal_information_date") or signal.get("last_valid_session")))
+    cols[1].metric("Last Market Data Date", value(publication.get("data_date") or signal.get("last_valid_session")))
     cols[2].metric("Forecast Target Session", value(publication.get("target_session_date")))
     for col, key, title, regime_key in zip(st.columns(2), ["markov", "xgboost"],
             ["Current Market Regime · Markov", "Next-Session Regime Forecast · XGBoost"],
@@ -693,6 +696,7 @@ def render_operational_overview(data):
     update = publication.get("update_status") or {}
     st.caption(f"Update Status: {str(update.get('status', 'Not reported')).replace('_', ' ').title()} · "
                f"Publication Generated: {publication.get('generated_at') or 'N/A'}")
+    st.caption(f"Last Successful Update: {publication.get('last_successful_update') or 'N/A'}")
     st.caption(f"Frozen Model Package: {value(publication.get('model_version'))} · "
                f"Source: {value(publication.get('source_mode'))}")
 
@@ -736,8 +740,7 @@ def fetch_backtesting_endpoint_safe(path: str, fallback, label: str):
         return fetch_backtesting_endpoint(path)
     except Exception as e:
         st.warning(
-            f"Unable to load {label}. Historical backtesting outputs are unavailable. "
-            "Run scripts/run_adaptive_backtest.py."
+            f"Unable to load {label}. The requested backtesting outputs are unavailable."
         )
         st.caption("Check API availability and the selected publication.")
         return fallback
@@ -1521,6 +1524,285 @@ def render_tail_latest(latest_payload):
     )
 
 
+@st.cache_data(ttl=30)
+def load_decision_history():
+    response = requests.get(f'{API_URL}/decision-explorer', timeout=10)
+    response.raise_for_status()
+    payload = response.json()
+    if not isinstance(payload, dict) or not payload.get('sessions') or not payload.get('mapping') or not payload.get('publication'):
+        raise ValueError('Incomplete decision history.')
+    return payload
+
+
+def render_decision_explorer():
+    st.subheader('Decision Explorer')
+    st.info('Historical Backtest — Not Live Trading Records.')
+    try:
+        payload = load_decision_history()
+    except (requests.RequestException, ValueError):
+        st.warning('Verified decision history is unavailable. Check FastAPI and the operational publication.')
+        return
+    publication = payload['publication']
+    if not publication.get('is_current'):
+        st.warning('The publication is stale or non-current. Selected decisions are retrospective model targets.')
+    st.caption(f"Model Package: {publication.get('model_version', 'N/A')} · Publication: {publication.get('version', 'N/A')} · "
+               f"Freshness: {publication.get('freshness', 'unverified').title()}")
+    history = pd.DataFrame(payload['sessions'])
+    dates = history.date.tolist()
+    selected = st.selectbox('Historical Trading Session', dates, index=len(dates) - 1,
+                            key='decision_session')
+    row = history.loc[history.date == selected].iloc[0]
+    cols = st.columns(3)
+    cols[0].metric('Market Information Date', selected)
+    cols[1].metric('Next Eligible Trading Session', row.next_session_date)
+    cols[2].metric('Selected IBEX Close', f'{row.ibex_close:,.2f}' if pd.notna(row.ibex_close) else 'N/A')
+    st.caption('Earlier target dates use the next observed market session in this publication. The final target uses its verified exchange calendar.')
+    mapping = pd.DataFrame(payload['mapping'])
+    label_by_id = mapping.set_index('regime').economic_label
+    col_markov, col_ml = st.columns(2)
+    col_markov.markdown(f"**Filtered Current State · Markov:** Regime {int(row.regime)} · {risk_label(label_by_id[row.regime])}")
+    col_ml.markdown(f"**Predicted Next State · XGBoost:** Regime {int(row.regime_pred)} · {risk_label(label_by_id[row.regime_pred])}")
+    probabilities = pd.DataFrame([{'Regime ID': int(item.regime), 'Economic Label': risk_label(item.economic_label),
+        'Markov · Filtered Current State': f"{row[f'p_regime_{int(item.regime)}']:.2%}",
+        'XGBoost · Predicted Next State': f"{row[f'proba_{int(item.regime)}']:.2%}"} for item in mapping.itertuples()])
+    st.dataframe(probabilities, use_container_width=True, hide_index=True)
+    st.markdown('**Verified CVaR Exposure Mapping**')
+    mapping_display = pd.DataFrame([{'Regime ID': int(item.regime), 'Economic Label': risk_label(item.economic_label),
+                                    'CVaR Target': f'{item.target_exposure:.2%}'} for item in mapping.itertuples()])
+    st.dataframe(mapping_display, use_container_width=True, hide_index=True)
+    exposures = mapping.set_index('regime').target_exposure
+    st.markdown(f"**Regime-Based:** filtered Markov Regime {int(row.regime)} → {exposures[row.regime]:.2%}. "
+                f"**ML Hard:** predicted next-session Regime {int(row.regime_pred)} → {exposures[row.regime_pred]:.2%}.")
+    terms = [f"{row[f'proba_{int(item.regime)}']:.6f} × {item.target_exposure:.6f}" for item in mapping.itertuples()]
+    st.markdown('**ML Probability-Weighted:** Σ P(next-session state) × CVaR target = ' +
+                ' + '.join(terms) + f' = {row.target_exposure_ml_proba:.2%}.')
+    st.caption('Mapping and probabilities come from the verified model version. Formula terms are rounded for display; targets use full precision.')
+    strategies = {'Regime-Based': 'regime_based', 'ML Hard': 'ml_hard', 'ML Probability-Weighted': 'ml_proba'}
+    comparison = []
+    for label, key in strategies.items():
+        previous = row[f'previous_target_{key}']
+        change = row[f'change_pp_{key}']
+        comparison.append({'Strategy': label, 'Previous Target': f'{previous:.2%}' if pd.notna(previous) else 'N/A',
+                           'Selected Target': f"{row[f'target_exposure_{key}']:.2%}",
+                           'Change (Percentage Points)': f'{change:+.2f}' if pd.notna(change) else 'N/A',
+                           'Direction': row[f'direction_{key}']})
+    st.markdown('**Previous Available Session Comparison**')
+    st.caption(f"Previous Information Date: {row.previous_session_date if pd.notna(row.previous_session_date) else 'N/A'}")
+    st.dataframe(pd.DataFrame(comparison), use_container_width=True, hide_index=True)
+    st.caption('Targets are hypothetical model allocations, not executed orders. Changes compare consecutive available signal sessions.')
+    strategy = st.selectbox('Decision Chart Strategy', list(strategies), key='decision_chart_strategy')
+    chart_data = history[['date', 'next_session_date', 'regime', 'economic_label',
+                          f'target_exposure_{strategies[strategy]}']].copy()
+    chart_data.columns = ['Signal Date', 'Target Session', 'Regime ID', 'Market Regime', 'Target Exposure']
+    chart_data['Market Regime'] = chart_data['Market Regime'].map(risk_label)
+    chart_data['Signal Date'] = pd.to_datetime(chart_data['Signal Date'])
+    transition = chart_data['Regime ID'].ne(chart_data['Regime ID'].shift())
+    transition.iloc[0] = False
+    base = alt.Chart(chart_data).encode(x=alt.X('Signal Date:T', title='Signal Information Date'),
+        y=alt.Y('Target Exposure:Q', axis=alt.Axis(format='.0%'), scale=alt.Scale(domain=[0, 1])),
+        tooltip=['Signal Date:T', 'Target Session:N', 'Regime ID:O', 'Market Regime:N',
+                 alt.Tooltip('Target Exposure:Q', format='.2%')])
+    line = base.mark_line(interpolate='step-after', color='#d6c2a8')
+    transitions = alt.Chart(chart_data.loc[transition]).mark_point(size=65, shape='diamond', filled=True).encode(
+        x='Signal Date:T', y='Target Exposure:Q', color=alt.Color('Market Regime:N',
+        scale=alt.Scale(domain=['Low Risk', 'Medium Risk', 'High Risk'], range=['#7fb58a', '#d2a450', '#be5a54'])),
+        tooltip=['Signal Date:T', 'Target Session:N', 'Regime ID:O', 'Market Regime:N'])
+    marker = alt.Chart(chart_data.loc[chart_data['Signal Date'] == pd.Timestamp(selected)]).mark_point(
+        size=180, shape='circle', filled=True, color='#67c7e5').encode(x='Signal Date:T', y='Target Exposure:Q')
+    st.altair_chart((line + transitions + marker).interactive(), use_container_width=True)
+    st.caption('Diamonds mark filtered Markov regime transitions; the blue circle marks the selected signal date. '
+               'Targets are plotted at the information close, not at an inferred execution time. Hover for target-session dates; zoom and pan to inspect history.')
+
+
+def render_strategy_results():
+    st.subheader("MAIN v1 Strategy Performance")
+    payload = fetch_backtesting_endpoint_safe('/backtesting/comparison', {}, 'versioned strategy performance')
+    if not isinstance(payload, dict) or not payload.get('results') or not payload.get('metrics'):
+        st.info("A complete validated operational strategy comparison is unavailable. Academic references remain in Research.")
+        return
+    publication = payload.get('publication') or {}
+    frame = pd.DataFrame(payload['results']).set_index('date')
+    frame.index = pd.to_datetime(frame.index)
+    metrics = pd.DataFrame(payload['metrics'])
+    st.caption(f"Frozen Engine: {publication.get('model_version', 'N/A')} · "
+               f"Publication Version: {publication.get('version', 'N/A')}")
+    st.caption(f"Common Evaluation Period: {frame.index.min():%Y-%m-%d} to {frame.index.max():%Y-%m-%d} · "
+               f"{len(frame):,} Market Sessions · Data Freshness: {publication.get('freshness', 'unverified').title()}")
+    if not publication.get('is_current'):
+        st.warning("Historical performance from a stale or non-current publication; this is not a current trading signal.")
+    st.caption("Frozen MAIN Markov parameters, causal-v1 XGBoost and training-only CVaR exposure mapping. "
+               "Prior-close targets apply once to the next available market return; the first signal date has no realised result.")
+    options = {'Buy & Hold': ('benchmark', 'Buy & Hold'), 'Regime-Based': ('regime_based', 'Regime-based'),
+               'ML Hard': ('ml_hard', 'ML Hard'), 'ML Probability-Weighted': ('ml_proba', 'ML Probability-Weighted')}
+    selected = st.multiselect('Strategies', list(options), default=list(options), key='performance_strategies')
+    basis = st.radio('Performance Basis', ['Gross', 'Net of Transaction Costs'], horizontal=True,
+                     key='performance_basis')
+    rate = payload.get('conventions', {}).get('cost_rate')
+    rate_label = f"{rate * 10000:g} bp" if isinstance(rate, (int, float)) else 'Unreported rate'
+    st.caption(f"Costs: {rate_label} × absolute change in applied exposure, deducted from daily log returns. "
+               "Initial entry and final liquidation are excluded. Buy & Hold has no modelled trading costs. "
+               "Cash earns zero; financing, slippage and taxes are excluded. Gross performance excludes transaction costs.")
+    st.caption("Growth uses exp(cumulative log returns); exposed log return = exposure × index log return. "
+               "Volatility uses sample daily standard deviation × √252. Expected Shortfall is the mean daily log return "
+               "at or below the empirical 5th percentile. Drawdown uses observed running peaks, excluding an initial capital anchor.")
+    if not selected:
+        st.info('Select at least one strategy to display performance.')
+        return
+    growth, drawdown, exposure, rows = {}, {}, {}, []
+    net = basis == 'Net of Transaction Costs'
+    for label in selected:
+        key, stored_label = options[label]
+        is_benchmark = key == 'benchmark'
+        column = f'{key}_cum' + ('_net' if net and not is_benchmark else '')
+        curve = frame[column]
+        legend = label + (' · No Modelled Costs' if net and is_benchmark else '')
+        growth[legend] = curve
+        drawdown[legend] = curve / curve.cummax() - 1
+        exposure[label] = pd.Series(1., index=frame.index) if is_benchmark else frame[f'strategy_exposure_{key}']
+        metric_label = stored_label if is_benchmark else stored_label + (' net of costs' if net else ' gross')
+        row = metrics.loc[metrics.strategy == metric_label].iloc[0]
+        rows.append({'Strategy': legend, 'Total Return': row.total_return,
+                     'Annualized Volatility': row.annualized_volatility, 'Expected Shortfall (95%)': row.CVaR_95,
+                     'Maximum Drawdown': row.max_drawdown, 'Total Transaction Costs (Log Return)': row.total_transaction_cost})
+    st.markdown(f'**Cumulative Growth · {basis}**')
+    st.line_chart(pd.DataFrame(growth), use_container_width=True)
+    st.markdown(f'**Drawdown Comparison · {basis}**')
+    st.line_chart(pd.DataFrame(drawdown), use_container_width=True)
+    st.markdown('**Historical Applied Exposure**')
+    st.line_chart(pd.DataFrame(exposure), use_container_width=True)
+    display = pd.DataFrame(rows)
+    for column in display.columns[1:]:
+        display[column] = display[column].map(lambda value: f'{value:.2%}')
+    st.dataframe(display, use_container_width=True, hide_index=True)
+    st.caption('Transaction costs are summed log-return deductions, not a cash invoice or compounded performance drag.')
+    turnover = pd.DataFrame(payload.get('turnover', []))
+    if not turnover.empty:
+        labels = {'Regime-based': 'Regime-Based', 'ML Hard Classification': 'ML Hard',
+                  'ML Probability-Weighted': 'ML Probability-Weighted'}
+        turnover['strategy'] = turnover.strategy.map(labels)
+        turnover = turnover[turnover.strategy.isin(selected)]
+        st.markdown('**Turnover · Absolute Exposure Units**')
+        st.dataframe(presentation_frame(turnover[['strategy', 'total_turnover', 'annualized_turnover',
+                                                  'raw_changes', 'effective_changes']]),
+                     use_container_width=True, hide_index=True)
+        st.caption('Effective changes exceed one percentage point; smaller changes still incur costs. Buy & Hold has no rebalancing turnover under this convention.')
+
+
+def render_academic_results():
+    st.info("Academic Reference — Original TFM Methodology")
+    st.subheader("Historical Backtesting")
+    st.markdown(
+        """
+        <div class="panel-box">
+            <div class="regime-card-detail">
+                Historical Backtesting compares a fully invested Buy & Hold benchmark
+                with a strategy that adjusts exposure to the identified risk regime.
+                Exposure is applied with a one-session lag, <b>shift(1)</b>, to avoid
+                look-ahead bias.
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if hasattr(st, "segmented_control"):
+        backtest_sample_label = st.segmented_control(
+            "Evaluation Sample",
+            ["MAIN", "ROBUST"],
+            default="MAIN",
+            key="backtesting_sample_selector",
+        )
+    else:
+        backtest_sample_label = st.radio(
+            "Evaluation Sample",
+            ["MAIN", "ROBUST"],
+            horizontal=True,
+            key="backtesting_sample_selector",
+        )
+    backtest_sample_label = backtest_sample_label or "MAIN"
+    backtest_sample = backtest_sample_label.lower()
+    render_split_badge(backtest_sample_label)
+
+    backtest_results = prepare_backtest_results(
+        fetch_backtesting_endpoint_safe(
+            f"/backtesting/academic/results?sample={backtest_sample}",
+            [],
+            f"backtest results for {backtest_sample_label}",
+        )
+    )
+    backtest_metrics = prepare_backtest_metrics(
+        fetch_backtesting_endpoint_safe(
+            "/backtesting/academic/metrics",
+            [],
+            "backtesting metrics",
+        ),
+        backtest_sample_label,
+    )
+    backtest_latest = fetch_backtesting_endpoint_safe(
+        f"/backtesting/academic/latest?sample={backtest_sample}",
+        {},
+        f"the last evaluated backtest session for {backtest_sample_label}",
+    )
+
+    st.markdown('<div class="section-title">Out-of-Sample Evaluation</div>', unsafe_allow_html=True)
+    render_backtest_metric_cards(backtest_metrics)
+    render_defensive_reading(backtest_metrics)
+
+    st.markdown('<div class="section-title">Last Evaluated Historical Session</div>', unsafe_allow_html=True)
+    render_backtest_latest(backtest_latest)
+
+    chart_col_left, chart_col_right = st.columns(2)
+    with chart_col_left:
+        st.markdown('<div class="section-title">Cumulative Return Curves</div>', unsafe_allow_html=True)
+        render_backtest_line_chart(
+            backtest_results,
+            ["benchmark_cum", "strategy_cum"],
+            ["Buy & Hold", "Regime Strategy"],
+            "Cumulative Return Curves",
+            "Cumulative Growth",
+        )
+    with chart_col_right:
+        st.markdown('<div class="section-title">Drawdown Comparison</div>', unsafe_allow_html=True)
+        render_backtest_line_chart(
+            backtest_results,
+            ["benchmark_drawdown", "strategy_drawdown"],
+            ["Buy & Hold", "Regime Strategy"],
+            "Drawdown Comparison",
+            "Drawdown",
+        )
+
+    st.markdown('<div class="section-title">Adaptive Portfolio Exposure</div>', unsafe_allow_html=True)
+    render_backtest_exposure(backtest_results)
+    st.caption(
+        "The strategy reduces exposure to 0.75 or 0.25 when the filtered regime indicates greater vulnerability."
+    )
+
+    st.markdown('<div class="section-title">Risk Metrics</div>', unsafe_allow_html=True)
+    if backtest_metrics.empty:
+        st.info("No metrics are available for the selected sample.")
+    else:
+        display_metrics = backtest_metrics.copy()
+        for column in [
+            "total_return",
+            "mean_daily_return",
+            "daily_volatility",
+            "annualized_volatility",
+            "VaR_95",
+            "CVaR_95",
+            "max_drawdown",
+        ]:
+            display_metrics[column] = display_metrics[column].map(
+                lambda value: f"{float(value):.2%}"
+            )
+        st.dataframe(presentation_frame(display_metrics), use_container_width=True, hide_index=True)
+
+    with st.expander("View Out-of-Sample Backtest Data"):
+        if backtest_results.empty:
+            st.info("No raw backtest data is available.")
+        else:
+            st.dataframe(presentation_frame(backtest_results.tail(250)), use_container_width=True, hide_index=True)
+
+
 enter = st.query_params.get("enter", "0")
 
 if enter != "1":
@@ -1535,19 +1817,9 @@ with left_btn:
         st.rerun()
 
 with right_btn:
-    if st.button("Update Market Data"):
-        with st.spinner("Updating data..."):
-            try:
-                response = requests.post(f"{API_URL}/run-update", timeout=320)
-                response.raise_for_status()
-                update_result = response.json()
-            except Exception as e:
-                st.error("The system update failed.")
-                st.caption("Check the API service logs for technical details.")
-            else:
-                st.success("Data updated successfully.")
-                st.cache_data.clear()
-                st.rerun()
+    st.button("Update Market Data", disabled=True,
+              help="Market updates are disabled until a protected update workflow is configured.")
+    st.caption("Market updates are disabled. No automated update workflow is configured.")
 
 data = None
 try:
@@ -1571,7 +1843,7 @@ st.markdown(
     <div class="topbar">
         <div class="topbar-title">RISKBEX</div>
         <div class="topbar-subtitle">
-            IBEX 35 Risk Intelligence · Publication Information Date: <b>{data['date'] if data else 'N/A'}</b>
+            IBEX 35 Risk Intelligence · Publication Information Date: <b>{(data.get('publication') or {}).get('data_date', 'N/A') if data else 'N/A'}</b>
         </div>
     </div>
     """,
@@ -1674,6 +1946,7 @@ with sections["Monitor"]:
             st.caption("Relative historical score intensity.")
 
 with sections["Explore"]:
+    render_decision_explorer()
     st.info("Historical MAIN publication data; this history is not a current signal.")
     df = select_period(df, "explore_period")
     explore_signals = prepare_regime_history(fetch_regime_endpoint_safe(
@@ -1766,6 +2039,8 @@ with sections["Explore"]:
 
 with sections["Research"]:
     st.info("Historical research and evaluation. MAIN versioned results shown here are historical. Consult Monitor for operational signals; ROBUST is an academic reference only.")
+    with st.expander("Academic Reference — Original TFM Methodology"):
+        render_academic_results()
     figure_options = {
         "Daily Returns": {
             "path": FIGURES_DIR / "daily_returns_ibex35.png",
@@ -1944,118 +2219,7 @@ with sections["Models"]:
         st.dataframe(presentation_frame(comparison_df), use_container_width=True, hide_index=True)
 
 with sections["Results"]:
-    st.info("Historical research and evaluation. MAIN versioned results shown here are historical. Consult Monitor for operational signals; ROBUST is an academic reference only.")
-    st.subheader("Historical Backtesting")
-    st.markdown(
-        """
-        <div class="panel-box">
-            <div class="regime-card-detail">
-                Historical Backtesting compares a fully invested Buy & Hold benchmark
-                with a strategy that adjusts exposure to the identified risk regime.
-                Exposure is applied with a one-session lag, <b>shift(1)</b>, to avoid
-                look-ahead bias.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    if hasattr(st, "segmented_control"):
-        backtest_sample_label = st.segmented_control(
-            "Evaluation Sample",
-            ["MAIN", "ROBUST"],
-            default="MAIN",
-            key="backtesting_sample_selector",
-        )
-    else:
-        backtest_sample_label = st.radio(
-            "Evaluation Sample",
-            ["MAIN", "ROBUST"],
-            horizontal=True,
-            key="backtesting_sample_selector",
-        )
-    backtest_sample_label = backtest_sample_label or "MAIN"
-    backtest_sample = backtest_sample_label.lower()
-    render_split_badge(backtest_sample_label)
-
-    backtest_results = prepare_backtest_results(
-        fetch_backtesting_endpoint_safe(
-            f"/backtesting/results?sample={backtest_sample}",
-            [],
-            f"backtest results for {backtest_sample_label}",
-        )
-    )
-    backtest_metrics = prepare_backtest_metrics(
-        fetch_backtesting_endpoint_safe(
-            "/backtesting/metrics",
-            [],
-            "backtesting metrics",
-        ),
-        backtest_sample_label,
-    )
-    backtest_latest = fetch_backtesting_endpoint_safe(
-        f"/backtesting/latest?sample={backtest_sample}",
-        {},
-        f"the last evaluated backtest session for {backtest_sample_label}",
-    )
-
-    st.markdown('<div class="section-title">Out-of-Sample Evaluation</div>', unsafe_allow_html=True)
-    render_backtest_metric_cards(backtest_metrics)
-    render_defensive_reading(backtest_metrics)
-
-    st.markdown('<div class="section-title">Last Evaluated Historical Session</div>', unsafe_allow_html=True)
-    render_backtest_latest(backtest_latest)
-
-    chart_col_left, chart_col_right = st.columns(2)
-    with chart_col_left:
-        st.markdown('<div class="section-title">Cumulative Return Curves</div>', unsafe_allow_html=True)
-        render_backtest_line_chart(
-            backtest_results,
-            ["benchmark_cum", "strategy_cum"],
-            ["Buy & Hold", "Regime Strategy"],
-            "Cumulative Return Curves",
-            "Cumulative Growth",
-        )
-    with chart_col_right:
-        st.markdown('<div class="section-title">Drawdown Comparison</div>', unsafe_allow_html=True)
-        render_backtest_line_chart(
-            backtest_results,
-            ["benchmark_drawdown", "strategy_drawdown"],
-            ["Buy & Hold", "Regime Strategy"],
-            "Drawdown Comparison",
-            "Drawdown",
-        )
-
-    st.markdown('<div class="section-title">Adaptive Portfolio Exposure</div>', unsafe_allow_html=True)
-    render_backtest_exposure(backtest_results)
-    st.caption(
-        "The strategy reduces exposure to 0.75 or 0.25 when the filtered regime indicates greater vulnerability."
-    )
-
-    st.markdown('<div class="section-title">Risk Metrics</div>', unsafe_allow_html=True)
-    if backtest_metrics.empty:
-        st.info("No metrics are available for the selected sample.")
-    else:
-        display_metrics = backtest_metrics.copy()
-        for column in [
-            "total_return",
-            "mean_daily_return",
-            "daily_volatility",
-            "annualized_volatility",
-            "VaR_95",
-            "CVaR_95",
-            "max_drawdown",
-        ]:
-            display_metrics[column] = display_metrics[column].map(
-                lambda value: f"{float(value):.2%}"
-            )
-        st.dataframe(presentation_frame(display_metrics), use_container_width=True, hide_index=True)
-
-    with st.expander("View Out-of-Sample Backtest Data"):
-        if backtest_results.empty:
-            st.info("No raw backtest data is available.")
-        else:
-            st.dataframe(presentation_frame(backtest_results.tail(250)), use_container_width=True, hide_index=True)
+    render_strategy_results()
 
 with sections["Tail Risk"]:
     st.info("Historical research and evaluation. MAIN versioned results shown here are historical. Consult Monitor for operational signals; ROBUST is an academic reference only.")

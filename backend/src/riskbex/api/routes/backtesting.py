@@ -138,3 +138,28 @@ def backtesting_latest(sample: str = "main", strategy: str = "regime_based"):
             detail=f"No adaptive backtest rows found for sample {normalized_sample}.",
         )
     return _latest_response(results_df.iloc[-1], normalized_sample)
+
+
+@router.get('/backtesting/comparison')
+def backtesting_comparison():
+    from src.riskbex.api.operational import snapshot, performance_snapshot
+    return performance_snapshot(snapshot())
+
+
+@router.get('/backtesting/academic/results', response_model=list[AdaptiveBacktestResultRow])
+def academic_results(sample: str = 'main'):
+    return _result_records(_load_results_or_raise(_normalize_sample(sample)))
+
+
+@router.get('/backtesting/academic/metrics', response_model=list[AdaptiveBacktestMetricsRow])
+def academic_metrics():
+    return _load_metrics_or_raise().to_dict(orient='records')
+
+
+@router.get('/backtesting/academic/latest', response_model=AdaptiveBacktestLatestResponse)
+def academic_latest(sample: str = 'main'):
+    normalized = _normalize_sample(sample)
+    frame = _load_results_or_raise(normalized)
+    if frame.empty:
+        raise HTTPException(status_code=404, detail='No academic backtest rows available.')
+    return _latest_response(frame.iloc[-1], normalized)

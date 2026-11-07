@@ -31,3 +31,18 @@ def historical_risk(limit: Optional[str] = None):
     except (TypeError, ValueError):
         count = 250
     return df.tail(count).to_dict(orient='records')
+
+
+@router.get('/decision-explorer')
+def decision_explorer(session: Optional[str] = None):
+    from fastapi import HTTPException
+    from src.riskbex.api.operational import snapshot
+    from src.riskbex.api.decisions import decision_snapshot
+    result = decision_snapshot(snapshot())
+    # Match published trading-session strings exactly; do not roll non-trading dates.
+    if session is not None:
+        selected = next((row for row in result['sessions'] if row['date'] == session), None)
+        if selected is None:
+            raise HTTPException(status_code=404, detail='The requested trading session is not available in this publication.')
+        result['selected'] = selected
+    return result

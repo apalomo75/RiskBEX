@@ -18,4 +18,5 @@ def load_operational_results(root, *, calendar, now):
             'update_status': json.loads(status_file.read_text()) if status_file.exists() else None,
             'history': pd.read_csv(directory / 'signals.csv', float_precision='round_trip'),
             'backtest': pd.read_csv(directory / 'backtest.csv', float_precision='round_trip'),
-            'metrics': pd.read_csv(directory / 'metrics.csv', float_precision='round_trip')}
+            'metrics': pd.read_csv(directory / 'metrics.csv', float_precision='round_trip'),
+            'turnover': pd.read_csv(directory / 'turnover.csv', float_precision='round_trip')}
