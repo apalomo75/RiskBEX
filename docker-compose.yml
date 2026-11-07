@@ -1,39 +1,90 @@
+x-runtime: &runtime
+  user: "${RISKBEX_UID:-1000}:${RISKBEX_GID:-1000}"
+  read_only: true
+  tmpfs:
+    - /tmp:rw,nosuid,nodev,size=256m
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  init: true
+  restart: unless-stopped
+
+x-store: &store
+  type: bind
+  source: ${RISKBEX_STORE:-./backend/runtime/docker-main}
+  target: /app/runtime/main
+  read_only: true
+  bind:
+    create_host_path: false
+
 services:
   api:
+    <<: *runtime
+    image: riskbex-api:local
     build:
       context: ./backend
       dockerfile: Dockerfile.api
-    container_name: riskbex-api
     environment:
       RISKBEX_DATA_DIR: /app/data
+      RISKBEX_OPERATIONAL_DIR: /app/runtime/main
+      RISKBEX_CALENDAR: /app/config/bme-2026.json
     volumes:
-      - ./backend/data:/app/data
-    ports:
-      - "8000:8000"
+      - *store
+      - type: bind
+        source: ./backend/data
+        target: /app/data
+        read_only: true
+        bind:
+          create_host_path: false
+    expose: ["8000"]
     healthcheck:
-      test:
-        [
-          "CMD",
-          "python",
-          "-c",
-          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')",
-        ]
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 20s
-    restart: unless-stopped
 
   dashboard:
+    <<: *runtime
     build:
       context: ./backend
       dockerfile: Dockerfile.dashboard
-    container_name: riskbex-dashboard
     environment:
       RISKBEX_API_URL: http://api:8000
     ports:
-      - "8501:8501"
+      - "127.0.0.1:8501:8501"
     depends_on:
       api:
         condition: service_healthy
-    restart: unless-stopped
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8501/_stcore/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  updater:
+    <<: *runtime
+    profiles: [scheduled]
+    image: riskbex-api:local
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.api
+    command: [python, -B, scripts/run_container_scheduler.py]
+    environment:
+      TZ: Europe/Madrid
+    volumes:
+      - <<: *store
+        read_only: false
+      - type: bind
+        source: ${RISKBEX_SEED:-./backend/runtime/inputs/seed.csv}
+        target: /inputs/seed.csv
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${RISKBEX_REGRESSION_RECEIPT:-./backend/runtime/inputs/receipt.json}
+        target: /inputs/receipt.json
+        read_only: true
+        bind:
+          create_host_path: false
+    stop_grace_period: 35s

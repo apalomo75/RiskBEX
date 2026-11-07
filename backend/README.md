@@ -48,6 +48,7 @@ Historical methodology and acceptance records are preserved in their original fo
 - [Sprint 2: frozen MAIN engine and incremental release plan](docs/sprint-2.md).
 - [Sprint 3: versioned MAIN pipeline and operational commands](docs/sprint-3.md).
 - [Sprint 6A: scheduled live updates, systemd setup and recovery](docs/sprint-6a.md).
+- [Sprint 6B: local Docker services, persistent publications and optional timer](docs/sprint-6b.md).
 
 Frozen MAIN artifacts are in `model_packages/main-v1/`. Operational updates use
 these models without retraining. Daily/full pipeline scripts require explicit

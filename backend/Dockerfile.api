@@ -1,19 +1,15 @@
-FROM python:3.11-slim
-
-ENV PYTHONUNBUFFERED=1
-ENV RISKBEX_DATA_DIR=/app/data
-
+FROM python:3.11.14-slim-bookworm
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 HOME=/tmp MPLCONFIGDIR=/tmp/matplotlib
 WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 && rm -rf /var/lib/apt/lists/*
+COPY requirements-docker.lock .
+RUN pip install --no-cache-dir -r requirements-docker.lock && pip check
 COPY main.py .
 COPY src ./src
 COPY scripts ./scripts
-
-RUN mkdir -p /app/data/raw /app/data/processed /app/figures/chapter2
-
+COPY config ./config
+COPY model_packages/main-v1 ./model_packages/main-v1
+RUN python -c "from src.riskbex.engine.package import verify_main_package; verify_main_package('model_packages/main-v1', check_runtime=True)"
+USER 1000:1000
 EXPOSE 8000
-
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

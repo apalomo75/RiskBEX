@@ -1,16 +1,11 @@
-FROM python:3.11-slim
-
-ENV PYTHONUNBUFFERED=1
-ENV RISKBEX_API_URL=http://127.0.0.1:8000
-
+FROM python:3.11.14-slim-bookworm
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 HOME=/tmp MPLCONFIGDIR=/tmp/matplotlib STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
 WORKDIR /app
-
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
+RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 && rm -rf /var/lib/apt/lists/*
+COPY requirements-docker.lock .
+RUN pip install --no-cache-dir -r requirements-docker.lock && pip check
 COPY dashboard.py .
 COPY figures ./figures
-
+USER 1000:1000
 EXPOSE 8501
-
 CMD ["streamlit", "run", "dashboard.py", "--server.address=0.0.0.0", "--server.port=8501"]
