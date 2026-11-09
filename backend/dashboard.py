@@ -39,6 +39,21 @@ st.markdown(
 
     .stMarkdown p { line-height: 1.65; }
 
+    .welcome-highlights {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem 1.25rem;
+        margin: 0.25rem 0 1rem;
+        padding: 0.65rem 0;
+        border-block: 1px solid var(--border);
+    }
+
+    .welcome-highlights span {
+        color: var(--sand-soft);
+        font-size: 0.95rem;
+        font-weight: 600;
+    }
+
     .stApp {
         background: linear-gradient(180deg, #0f0f0f 0%, #171717 55%, #111111 100%);
         color: var(--white-soft);
@@ -533,12 +548,36 @@ def render_strategy_explanations():
         st.write("Probability weighting is not assumed to outperform. Historical returns, downside risk and costs determine whether it adds value.")
 
 
+def render_welcome_publication(data):
+    publication = data.get("publication") if isinstance(data, dict) else None
+    if not isinstance(publication, dict) or not publication.get("data_date"):
+        st.caption("Market data status unavailable · Automatic update status unavailable")
+        return
+    freshness = publication.get("freshness")
+    if freshness == "current" and publication.get("is_current") is True:
+        status = "Current publication"
+    elif freshness in {"stale", "historical", "simulated"} or publication.get("is_current") is False:
+        status = "Stale / non-current publication"
+    else:
+        status = "Market data status unavailable"
+    st.caption(f"Last published market session: {publication['data_date']} · {status}")
+    st.caption("Automatic update status unavailable · Publication freshness does not verify automatic execution.")
+
+
 def show_landing():
     st.title("RISKBEX")
+    st.markdown(
+        '<div class="welcome-highlights" aria-label="RISKBEX features">'
+        '<span>Automated Daily Pipeline</span>'
+        '<span>Markov + Machine Learning</span>'
+        '<span>IBEX 35 Market Data</span></div>',
+        unsafe_allow_html=True,
+    )
     st.markdown("**Developed by Alejandro Palomo Morales**")
-    st.header("What if Machine Learning could help investors reduce exposure before the market’s worst drawdowns?")
+    st.header("What if Machine Learning could help investors adapt to changing market risk?")
     st.subheader("Pursue market returns. Manage downside risk.")
-    st.write("RISKBEX monitors IBEX 35 market risk, detects vulnerable conditions and adapts market exposure using regime-based and Machine Learning signals. Its aim is to reduce downside risk and avoid part of severe market drawdowns, while accepting that protection may sacrifice some returns.")
+    st.write("RISKBEX combines quantitative risk models, machine learning and an automated market-data pipeline to monitor the IBEX 35 and evaluate adaptive investment strategies designed to manage downside risk.")
+    render_welcome_publication(data)
     st.info("Risk can be reduced, not eliminated. Signals can be wrong, losses remain possible and lower exposure can miss market gains. Profits are never guaranteed.")
     cards = list(zip(PAGES[1:], [
         "Learn how the risk signals work.", "Compare returns, losses and missed upside.",

@@ -30,6 +30,9 @@ class DashboardUI(unittest.TestCase):
     def test_welcome_and_overview_explanations(self):
         app = self.run_app(lambda *a, **k: Mock(json=lambda: {}, raise_for_status=lambda: None))
         self.assertEqual(app.title[0].value, 'RISKBEX')
+        highlights = next(x.value for x in app.markdown if 'welcome-highlights' in x.value and '<span>' in x.value)
+        for feature in ['Automated Daily Pipeline', 'Markov + Machine Learning', 'IBEX 35 Market Data']:
+            self.assertIn('<span>' + feature + '</span>', highlights)
         self.assertTrue(any('Developed by Alejandro Palomo Morales' in x.value for x in app.markdown))
         pages = ['Overview', 'Performance', 'Investment Simulator', 'Risk Monitor', 'Research & Methodology']
         self.assertEqual([b.label for b in app.button], ['Explore ' + p for p in pages])
@@ -47,6 +50,40 @@ class DashboardUI(unittest.TestCase):
         self.assertTrue(any('Historical Strategy Performance' == x.value for x in performance.subheader))
         simulator = self.run_app(lambda *a, **k: Mock(json=lambda: {}, raise_for_status=lambda: None), 'Investment Simulator')
         self.assertTrue(any('Investment Simulator' == x.value for x in simulator.subheader))
+
+    def test_welcome_publication_freshness(self):
+        for freshness, current, label in [
+            ('current', True, 'Current publication'),
+            ('stale', False, 'Stale / non-current publication'),
+            ('historical', False, 'Stale / non-current publication'),
+            ('simulated', False, 'Stale / non-current publication'),
+            ('current', False, 'Stale / non-current publication'),
+            ('stale', True, 'Stale / non-current publication'),
+            (None, None, 'Market data status unavailable'),
+        ]:
+            with self.subTest(freshness=freshness, current=current):
+                st.cache_data.clear()
+                payload = {'publication': {'data_date': '2026-04-23', 'freshness': freshness,
+                                           'is_current': current}, 'signal': {'last_valid_session': '2026-04-22'}}
+                app = self.run_app(lambda *a, **k: Mock(json=lambda: payload if '/latest-risk' in a[0] else [], raise_for_status=lambda: None))
+                captions = ' '.join(x.value for x in app.caption)
+                self.assertIn('Last published market session: 2026-04-23 · ' + label, captions)
+                self.assertIn('Automatic update status unavailable', captions)
+                self.assertNotIn('Automatically updated today', captions)
+                self.assertNotIn('Live', captions)
+
+    def test_welcome_publication_unavailable(self):
+        for response in [
+            lambda *a, **k: (_ for _ in ()).throw(requests.ConnectionError('offline')),
+            lambda *a, **k: Mock(json=lambda: {}, raise_for_status=lambda: None),
+            lambda *a, **k: Mock(json=lambda: {'publication': {'is_current': True}, 'signal': {'last_valid_session': '2026-04-23'}} if '/latest-risk' in a[0] else [], raise_for_status=lambda: None),
+        ]:
+            st.cache_data.clear()
+            app = self.run_app(response)
+            captions = ' '.join(x.value for x in app.caption)
+            self.assertIn('Market data status unavailable', captions)
+            self.assertNotIn('Current publication', captions)
+            self.assertNotIn('Last published market session:', captions)
 
     def test_unavailable_api_keeps_all_content_sections(self):
         app = self.run_app(lambda *a, **k: (_ for _ in ()).throw(requests.ConnectionError('offline')), 'Monitor')
