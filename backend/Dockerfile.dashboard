@@ -5,6 +5,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 && rm 
 COPY requirements-docker.lock .
 RUN pip install --no-cache-dir -r requirements-docker.lock && pip check
 COPY dashboard.py .
+COPY src ./src
+COPY .streamlit ./.streamlit
 COPY figures ./figures
 USER 1000:1000
 EXPOSE 8501

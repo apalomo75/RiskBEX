@@ -110,6 +110,29 @@ class StrategyPerformanceTests(unittest.TestCase):
             value = payload if '/backtesting/comparison' in url else ({} if '/latest' in url else [])
             return Mock(json=lambda: value, raise_for_status=lambda: None)
         app = self.run_app(get, 'Results')
+        overview = next(t for t in app.tabs if t.label == 'Overview')
+        performance = next(t for t in app.tabs if t.label == 'Performance')
+        overview_table = next(w.value for w in overview.dataframe if 'Total Return' in w.value.columns)
+        self.assertEqual(len(overview_table), 4)
+        for name in ['Buy & Hold', 'Regime-Based', 'ML Hard', 'ML Probability-Weighted']:
+            self.assertTrue(any(name in w.value for w in overview.markdown))
+            self.assertTrue(any(name in w.value for w in performance.markdown))
+        expected = pd.DataFrame(payload['metrics']).set_index('strategy')
+        for name, stored in [('Buy & Hold', 'Buy & Hold'), ('Regime-Based', 'Regime-based net of costs'),
+                             ('ML Hard', 'ML Hard net of costs'), ('ML Probability-Weighted', 'ML Probability-Weighted net of costs')]:
+            row = overview_table.loc[overview_table.Strategy == name].iloc[0]
+            for label, key in [('Total Return', 'total_return'), ('Annualized Volatility', 'annualized_volatility'),
+                               ('Expected Shortfall (95%)', 'CVaR_95'), ('Maximum Drawdown', 'max_drawdown')]:
+                self.assertEqual(row[label], f'{expected.loc[stored, key]:.2%}')
+        self.assertTrue(any('ML Hard versus Regime-Based' in w.value for w in performance.markdown))
+        self.assertTrue(any(w.value == 'What the Results Mean' for w in performance.subheader))
+        gross_story = next(w.value for w in performance.markdown if 'ML Hard versus Regime-Based' in w.value)
+        self.assertIn('Transaction Costs: +0.00 log-return points', gross_story)
+        self.assertTrue(any('ML Probability-Weighted versus ML Hard' in w.value for w in performance.markdown))
+        simulator = next(t for t in app.tabs if t.label == 'Investment Simulator')
+        self.assertEqual(len(simulator.metric), 0)
+        self.assertEqual(len(simulator.button), 0)
+        self.assertEqual(len(simulator.slider), 0)
         selector = next(w for w in app.multiselect if w.label == 'Strategies')
         self.assertEqual(len(selector.value), 4)
         self.assertTrue(any('stale or non-current' in w.value for w in app.warning))
@@ -119,9 +142,26 @@ class StrategyPerformanceTests(unittest.TestCase):
             post.assert_not_called()
         self.assertEqual(len(app.exception), 0, str(app.exception))
         tables = [w.value for w in app.dataframe if 'Total Return' in w.value.columns]
-        self.assertEqual(len(tables), 1)
-        self.assertEqual(tables[0].iloc[0]['Strategy'], 'ML Hard')
-        self.assertEqual(tables[0].iloc[0]['Total Return'], '74.52%')
+        self.assertEqual(len(tables), 2)
+        self.assertEqual(tables[1].iloc[0]['Strategy'], 'ML Hard')
+        self.assertEqual(tables[1].iloc[0]['Total Return'], '74.52%')
+        performance = next(t for t in app.tabs if t.label == 'Performance')
+        ml = expected.loc['ML Hard net of costs']
+        regime = expected.loc['Regime-based net of costs']
+        delta = (ml.total_return - regime.total_return) * 100
+        self.assertTrue(any(f'ML Hard versus Regime-Based — Total Return: {delta:+.2f} percentage points' in w.value
+                            for w in performance.markdown))
+        self.assertTrue(any('ML Hard versus Buy & Hold' in w.value for w in performance.markdown))
+        net_story = next(w.value for w in performance.markdown if 'ML Hard versus Regime-Based' in w.value)
+        cost_delta = (ml.total_transaction_cost - regime.total_transaction_cost) * 100
+        self.assertIn(f'Transaction Costs: {cost_delta:+.2f} log-return points (higher costs)', net_story)
+        frame = pd.DataFrame(payload['results'])
+        falling = frame.loc[frame.benchmark_return < 0]
+        loss_difference = (falling.ml_hard_return_net - falling.benchmark_return).sum() * 100
+        self.assertTrue(any(f'{len(falling):,} down-market sessions' in w.value and
+                            f'{loss_difference:+.2f} log-return points (less loss than Buy & Hold)' in w.value
+                            for w in performance.markdown))
+        self.assertTrue(any('not continuous-period returns' in w.value for w in performance.caption))
         self.assertTrue(any('Academic Reference — Original TFM Methodology' in w.label for w in app.expander))
 
     def test_dashboard_missing_comparison(self):

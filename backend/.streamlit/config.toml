@@ -1,0 +1,9 @@
+# A single custom dark theme; do not define switchable light/dark variants.
+[theme]
+base = "dark"
+primaryColor = "#9b7954"
+backgroundColor = "#0f0f0f"
+secondaryBackgroundColor = "#202020"
+textColor = "#f8f6f2"
+font = "sans-serif"
+baseFontSize = 17

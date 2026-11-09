@@ -15,3 +15,6 @@
 **/*.pyc
 !figures/
 !figures/**
+
+!.streamlit/
+!.streamlit/config.toml

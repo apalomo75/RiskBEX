@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from src.riskbex.api.routes import backtesting, health, regimes, risk, tail_risk, updates
+from src.riskbex.api.routes import backtesting, health, regimes, risk, tail_risk, updates, simulation
 
 
 app = FastAPI(title="RISKBEX API")
@@ -11,3 +11,5 @@ app.include_router(regimes.router)
 app.include_router(risk.router)
 app.include_router(tail_risk.router)
 app.include_router(updates.router)
+
+app.include_router(simulation.router)

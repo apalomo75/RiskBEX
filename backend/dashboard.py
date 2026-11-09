@@ -1,4 +1,3 @@
-import inspect
 import altair as alt
 import streamlit as st
 import requests
@@ -6,8 +5,11 @@ import pandas as pd
 import os
 import matplotlib.pyplot as plt
 from pathlib import Path
+from src.riskbex.simulator_ui import render_investment_simulator
+from src.riskbex.performance_story import comparison_stories, participation_stories
 
 API_URL = os.getenv("RISKBEX_API_URL", "http://127.0.0.1:8000").rstrip("/")
+plt.rcParams.update({"font.size": 12, "axes.labelsize": 12, "xtick.labelsize": 11, "ytick.labelsize": 11})
 BASE_DIR = Path(__file__).resolve().parent
 FIGURES_DIR = BASE_DIR / "figures" / "chapter2"
 
@@ -34,6 +36,8 @@ st.markdown(
         --border: rgba(214, 194, 168, 0.20);
         --shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
     }
+
+    .stMarkdown p { line-height: 1.65; }
 
     .stApp {
         background: linear-gradient(180deg, #0f0f0f 0%, #171717 55%, #111111 100%);
@@ -139,7 +143,7 @@ st.markdown(
         border: 1px solid rgba(214, 194, 168, 0.25);
         border-radius: 999px;
         padding: 0.45rem 0.95rem;
-        font-size: 0.84rem;
+        font-size: 0.95rem;
         letter-spacing: 0.05em;
         margin-bottom: 1rem;
     }
@@ -270,7 +274,7 @@ st.markdown(
     }
 
     .metric-label {
-        font-size: 0.82rem;
+        font-size: 0.95rem;
         color: var(--muted);
         margin-bottom: 0.5rem;
         text-transform: uppercase;
@@ -323,7 +327,7 @@ st.markdown(
 
     .regime-card-title {
         color: var(--muted);
-        font-size: 0.82rem;
+        font-size: 0.95rem;
         letter-spacing: 0.05em;
         text-transform: uppercase;
         margin-bottom: 0.45rem;
@@ -349,7 +353,7 @@ st.markdown(
         padding: 0.38rem 0.75rem;
         background: rgba(214, 194, 168, 0.10);
         color: var(--sand-light);
-        font-size: 0.86rem;
+        font-size: 0.95rem;
         margin-bottom: 0.75rem;
     }
 
@@ -513,27 +517,137 @@ st.markdown(
 )
 
 
+STRATEGY_EXPLANATIONS = {
+    "Buy & Hold": "Fully invested benchmark; no adaptive risk management.",
+    "Regime-Based": "Reactive allocation: uses the current Markov filtered market regime to choose its CVaR-based exposure.",
+    "ML Hard": "Predictive allocation: uses the most likely XGBoost next-session risk regime to choose its CVaR-based exposure.",
+    "ML Probability-Weighted": "Predictive probabilistic allocation: combines all next-session regime probabilities with their CVaR exposure targets. It represents prediction uncertainty and allows gradual allocation changes instead of choosing a single hard classification.",
+}
+TECHNICAL_PUBLICATIONS = {}
+
+
+def render_strategy_explanations():
+    with st.expander("How the Four Strategies Work"):
+        for name, explanation in STRATEGY_EXPLANATIONS.items():
+            st.markdown(f"**{name}** — {explanation}")
+        st.write("Probability weighting is not assumed to outperform. Historical returns, downside risk and costs determine whether it adds value.")
+
+
 def show_landing():
-    st.markdown("""
-    <div class="topbar">
-        <div class="landing-kicker">IBEX 35 · Quantitative Risk Intelligence</div>
-        <h1 class="landing-title">RISKBEX</h1>
-        <h2>Understand risk. Adapt exposure.</h2>
-        <p class="landing-subtitle">Monitor IBEX 35 risk through market regimes,
-        Machine Learning and Conditional Value at Risk. Explore quantitative signals,
-        compare strategies and analyse their historical performance.</p>
-        <p class="landing-author">Alejandro Palomo Morales</p>
-    </div>
-    """, unsafe_allow_html=True)
-    for col, page, description in zip(st.columns(3),
-            ["Monitor", "Explore", "Models"],
-            ["Market conditions and operational signals.",
-             "Interactive risk history and portfolio exposure.",
-             "Understand Markov regimes, XGBoost and CVaR."]):
-        with col:
-            st.markdown(f"### {page}")
-            st.write(description)
-            st.link_button(f"Open {page}", f"?enter=1&view={page}")
+    st.title("RISKBEX")
+    st.markdown("**Developed by Alejandro Palomo Morales**")
+    st.header("What if Machine Learning could help investors reduce exposure before the market’s worst drawdowns?")
+    st.subheader("Pursue market returns. Manage downside risk.")
+    st.write("RISKBEX monitors IBEX 35 market risk, detects vulnerable conditions and adapts market exposure using regime-based and Machine Learning signals. Its aim is to reduce downside risk and avoid part of severe market drawdowns, while accepting that protection may sacrifice some returns.")
+    st.info("Risk can be reduced, not eliminated. Signals can be wrong, losses remain possible and lower exposure can miss market gains. Profits are never guaranteed.")
+    cards = list(zip(PAGES[1:], [
+        "Learn how the risk signals work.", "Compare returns, losses and missed upside.",
+        "Explore what a hypothetical investment experienced.", "Read the latest published risk conditions.",
+        "Examine the evidence, methods and limitations."]))
+    for row in (cards[:3], cards[3:]):
+        for col, (page, description) in zip(st.columns(len(row), border=True), row):
+            with col:
+                with st.container(height="stretch"):
+                    st.markdown(f"### {page}")
+                    st.write(description)
+                st.button("Explore " + page, key="welcome_" + page,
+                          on_click=select_page, args=(page,), width="stretch")
+    st.caption("Start with Performance to assess the evidence, then try the Investment Simulator with your own hypothetical capital. Historical simulations do not guarantee future performance.")
+
+
+def show_overview():
+    st.title("How RISKBEX Reads Risk")
+    st.write("The goal is to participate in market returns while taking less exposure when conditions look vulnerable. Exposure means the share allocated to the index; the remainder is hypothetical cash. Less exposure can soften losses, but also reduce gains.")
+    st.markdown("**Market data → Risk indicators → Regime / ML forecast → Exposure adjustment**")
+    st.caption("Signals describe risk, not certain price moves. Exposure targets use information available before the return session.")
+    left, right = st.columns(2)
+    with left:
+        st.subheader("CVaR / Expected Shortfall")
+        st.write("How painful were the worst days? At 95% confidence, Expected Shortfall averages the returns in roughly the worst 5% of observed sessions. It helps assess the severity of tail losses beyond an ordinary bad day; it is not a maximum possible loss.")
+        losses = pd.DataFrame({"Session": range(1, 21), "Daily return": [-.08] + [-.01] * 9 + [.01] * 10})
+        chart = alt.Chart(losses).mark_bar().encode(
+            x=alt.X("Session:O", title="Illustrative sessions, ordered by return"),
+            y=alt.Y("Daily return:Q", axis=alt.Axis(format=".0%")),
+            color=alt.condition(alt.datum.Session == 1, alt.value("#e69b83"), alt.value("#d6c2a8")))
+        st.altair_chart(chart, use_container_width=True)
+        st.caption("Illustration only, not IBEX data: the worst 1 of 20 days loses 8%, so this simplified tail average is −8%. Real losses may be worse.")
+        st.subheader("Volatility")
+        st.write("How bumpy is the ride? Volatility measures how widely daily returns move around their average. Higher volatility means larger swings in either direction. It helps compare uncertainty, but does not distinguish gains from losses.")
+    with right:
+        st.subheader("Drawdown")
+        st.write("How far below a previous peak is an investment? A fall from €100 to €80 is a 20% drawdown. This shows the loss an investor would experience from that peak before recovery; recovery is not assured.")
+        path = pd.DataFrame({"Step": [1, 2, 3, 4, 5], "Value": [90, 100, 90, 80, 95]})
+        chart = alt.Chart(path).mark_line(point=True, color="#d6c2a8").encode(
+            x=alt.X("Step:O", title="Illustrative investment path"),
+            y=alt.Y("Value:Q", title="Portfolio value (€)", scale=alt.Scale(domain=[70, 105])))
+        st.altair_chart(chart, use_container_width=True)
+        st.caption("Illustration only: peak €100 → trough €80 → partial recovery €95. The investment remains 5% below its peak.")
+        st.subheader("Market Regimes and Machine Learning")
+        st.write("Are conditions calm or vulnerable? Market regimes group patterns in risk indicators into different risk states. The regime-based signal estimates the current state; Machine Learning estimates probabilities for the next session’s risk state. These are uncertain assessments, not predictions of an exact decline.")
+    st.subheader("From risk signals to an investment decision")
+    st.write("Frozen CVaR-based rules translate risk states into exposure targets. ML Hard uses the most likely next-session state; ML Probability-Weighted combines the state targets using their forecast probabilities. Buy & Hold stays fully invested as the comparison.")
+    st.warning("Protection has a price: reduced exposure can limit some losses, miss rebounds and incur trading costs. Compare realised historical returns, volatility, drawdowns and tail losses before judging a strategy. No strategy removes risk.")
+    render_strategy_explanations()
+    st.subheader("Historical Performance at a Glance")
+    payload = fetch_backtesting_endpoint_safe('/backtesting/comparison', {}, 'historical strategy comparison')
+    if isinstance(payload, dict) and payload.get('results') and payload.get('metrics'):
+        TECHNICAL_PUBLICATIONS['Performance'] = payload.get('publication', {})
+        publication = payload.get('publication') or {}
+        dates = pd.to_datetime(pd.DataFrame(payload['results']).date)
+        st.caption(f"Historical evaluation: {dates.min():%Y-%m-%d} to {dates.max():%Y-%m-%d}. All four strategies, net of modelled transaction costs; Buy & Hold has no modelled trading costs.")
+        if not publication.get('is_current'):
+            st.warning("Historical performance from a stale or non-current publication; this is not a current trading signal.")
+        rows = performance_summary(pd.DataFrame(payload['metrics']), net=True)
+        render_comparison_table(rows)
+        st.caption("Cash earns zero. Financing, slippage and taxes are excluded. See Performance for gross results, exposures, turnover and cost assumptions.")
+    else:
+        st.info("A complete validated operational strategy comparison is unavailable. No performance estimates are substituted.")
+    st.caption("Historical simulations are not live investment results or guarantees of future performance. RISKBEX provides research information, not investment advice or automatic investment recommendations.")
+
+
+def performance_summary(metrics, net, selected=None):
+    rows = []
+    for label, stored in [('Buy & Hold', 'Buy & Hold'), ('Regime-Based', 'Regime-based'),
+                          ('ML Hard', 'ML Hard'), ('ML Probability-Weighted', 'ML Probability-Weighted')]:
+        if selected is not None and label not in selected:
+            continue
+        key = stored if label == 'Buy & Hold' else stored + (' net of costs' if net else ' gross')
+        matches = metrics.loc[metrics.strategy == key]
+        if matches.empty:
+            continue
+        row = matches.iloc[0]
+        rows.append({'Strategy': label, 'Total Return': row.total_return,
+                     'Annualized Volatility': row.annualized_volatility,
+                     'Expected Shortfall (95%)': row.CVaR_95, 'Maximum Drawdown': row.max_drawdown,
+                     'Total Transaction Costs (Log Return)': row.total_transaction_cost})
+    return rows
+
+
+def render_comparison_table(rows):
+    display = pd.DataFrame(rows)
+    for column in display.columns[1:]:
+        display[column] = display[column].map(lambda value: f'{value:.2%}')
+    st.dataframe(display, use_container_width=True, hide_index=True)
+
+
+def render_performance_reading(rows, selected, payload, net):
+    st.subheader("What the Results Mean")
+    st.markdown("**Pursue market returns. Manage downside risk.**")
+    basis = 'Net of Transaction Costs' if net else 'Gross'
+    dates = pd.to_datetime(pd.DataFrame(payload['results']).date)
+    st.caption(f"{basis} · {dates.min():%Y-%m-%d} to {dates.max():%Y-%m-%d}. Comparisons use the same published sessions and cost assumptions as the charts. References remain available when hidden in the chart.")
+    st.markdown("**Returns, Downside Risk and the Incremental Value of ML**")
+    for story in comparison_stories(rows, selected, payload.get('turnover', [])):
+        st.write(story)
+    st.caption("Return differences measure cumulative return gained or sacrificed. Expected Shortfall and drawdown are signed losses: positive differences mean less severe losses. Turnover sums absolute exposure changes; one exposure unit equals a 100 percentage-point allocation change. Costs are summed log-return deductions, not compounded return drag. Gross results exclude these deductions; net results include them. No single metric establishes an overall winner.")
+    st.markdown("**Protection and Missed Market Participation**")
+    for story in participation_stories(payload['results'], selected, net):
+        st.write(story)
+    st.caption("Up/down groups use the sign of the IBEX daily return. Differences sum strategy minus benchmark daily log returns within each group; they are not continuous-period returns or drawdown reductions. Flat sessions are excluded from these groups but remain in full-period results. Net differences include transaction costs. Average exposure alone does not establish protection.")
+    with st.expander("Why Adaptive Exposure Has Trade-Offs"):
+        st.write("Lower equity exposure can soften losses on declining sessions, but can also miss gains during strong bull markets. Timing, turnover and costs determine the observed balance.")
+        st.write("A regime forecast estimates next-session risk-state probabilities. It does not forecast exact prices or identify the timing of a market crash.")
+        st.write("Backtests describe historical simulations using stated assumptions. They do not guarantee capital preservation or future performance and are not investment recommendations.")
 
 
 def metric_card(label: str, value: str, note: str):
@@ -579,7 +693,7 @@ def render_status_box(regime_label: str, risk_score: float):
         <div class="{css_class}">
             <div class="status-title">{title}</div>
             <div class="status-text">
-                Detected Regime: <b>{regime_label.upper()}</b><br>
+                Detected Regime: <b>{risk_label(regime_label)}</b><br>
                 Aggregate Relative Risk: <b>{int(risk_score)} / 100</b>
             </div>
             <div class="status-text" style="margin-top: 0.5rem;">
@@ -647,12 +761,13 @@ def render_price_regimes(frame):
 
 
 def render_operational_overview(data):
-    st.subheader("MAIN Operational Monitor")
+    st.subheader("Market Risk and Exposure")
     publication = data.get("publication") or {}
     signal = data.get("signal") or {}
     if not publication or not signal:
         st.warning("No verifiable operational publication is available. Legacy data must not be treated as current.")
         return
+    TECHNICAL_PUBLICATIONS["Market Risk"] = publication
     freshness = publication.get("freshness")
     labels = {"current": "Current", "stale": "Stale Market Data",
               "simulated": "Simulated Data", "historical": "Historical Data"}
@@ -679,26 +794,21 @@ def render_operational_overview(data):
         model = signal.get(key) or {}
         with col:
             st.markdown(f"**{title}**")
-            st.write(f"Regime: {value(model.get(regime_key))} · {risk_label(model.get('economic_label'))}")
+            st.write(risk_label(model.get("economic_label")))
             probabilities = model.get("probabilities") or {}
             for regime in range(3):
-                st.write(f"P(Regime {regime}): {value(probabilities.get(str(regime)), True)}")
+                st.write(f"{risk_label({0: 'low_risk', 1: 'high_risk', 2: 'medium_risk'}[regime])}: {value(probabilities.get(str(regime)), True)}")
     st.caption("Target exposures from simulated quantitative strategies; these are not personalised investment recommendations.")
     targets = signal.get("target_exposures") or {}
     for col, key, label in zip(st.columns(3),
             ["regime_based", "ml_hard", "ml_probability_weighted"],
-            ["Regime-Based Strategy", "ML Hard Strategy", "Probability-Weighted Strategy"]):
+            ["Regime-Based", "ML Hard", "ML Probability-Weighted"]):
         col.metric(f"Target Portfolio Exposure {label}", value(targets.get(key), True))
     st.markdown("**How the decision is formed.** The Regime-Based Strategy uses the filtered Markov state. "
                 "ML Hard Strategy uses the most likely XGBoost next-session state. "
-                "Probability-Weighted Strategy combines regime exposures using forecast probabilities. "
+                "ML Probability-Weighted combines regime exposures using forecast probabilities. "
                 "Targets are for the next market session; applied historical exposure may differ.")
-    update = publication.get("update_status") or {}
-    st.caption(f"Update Status: {str(update.get('status', 'Not reported')).replace('_', ' ').title()} · "
-               f"Publication Generated: {publication.get('generated_at') or 'N/A'}")
-    st.caption(f"Last Successful Update: {publication.get('last_successful_update') or 'N/A'}")
-    st.caption(f"Frozen Model Package: {value(publication.get('model_version'))} · "
-               f"Source: {value(publication.get('source_mode'))}")
+    st.caption(f"Last successful update: {publication.get('last_successful_update') or 'N/A'}")
 
 
 @st.cache_data(ttl=30)
@@ -1545,8 +1655,8 @@ def render_decision_explorer():
     publication = payload['publication']
     if not publication.get('is_current'):
         st.warning('The publication is stale or non-current. Selected decisions are retrospective model targets.')
-    st.caption(f"Model Package: {publication.get('model_version', 'N/A')} · Publication: {publication.get('version', 'N/A')} · "
-               f"Freshness: {publication.get('freshness', 'unverified').title()}")
+    TECHNICAL_PUBLICATIONS['Decision Explorer'] = publication
+    TECHNICAL_PUBLICATIONS['Exposure Mapping'] = payload['mapping']
     history = pd.DataFrame(payload['sessions'])
     dates = history.date.tolist()
     selected = st.selectbox('Historical Trading Session', dates, index=len(dates) - 1,
@@ -1560,19 +1670,19 @@ def render_decision_explorer():
     mapping = pd.DataFrame(payload['mapping'])
     label_by_id = mapping.set_index('regime').economic_label
     col_markov, col_ml = st.columns(2)
-    col_markov.markdown(f"**Filtered Current State · Markov:** Regime {int(row.regime)} · {risk_label(label_by_id[row.regime])}")
-    col_ml.markdown(f"**Predicted Next State · XGBoost:** Regime {int(row.regime_pred)} · {risk_label(label_by_id[row.regime_pred])}")
-    probabilities = pd.DataFrame([{'Regime ID': int(item.regime), 'Economic Label': risk_label(item.economic_label),
+    col_markov.markdown(f"**Filtered Current State · Markov:** {risk_label(label_by_id[row.regime])}")
+    col_ml.markdown(f"**Predicted Next State · XGBoost:** {risk_label(label_by_id[row.regime_pred])}")
+    probabilities = pd.DataFrame([{'Market Regime': risk_label(item.economic_label),
         'Markov · Filtered Current State': f"{row[f'p_regime_{int(item.regime)}']:.2%}",
         'XGBoost · Predicted Next State': f"{row[f'proba_{int(item.regime)}']:.2%}"} for item in mapping.itertuples()])
     st.dataframe(probabilities, use_container_width=True, hide_index=True)
     st.markdown('**Verified CVaR Exposure Mapping**')
-    mapping_display = pd.DataFrame([{'Regime ID': int(item.regime), 'Economic Label': risk_label(item.economic_label),
+    mapping_display = pd.DataFrame([{'Market Regime': risk_label(item.economic_label),
                                     'CVaR Target': f'{item.target_exposure:.2%}'} for item in mapping.itertuples()])
     st.dataframe(mapping_display, use_container_width=True, hide_index=True)
     exposures = mapping.set_index('regime').target_exposure
-    st.markdown(f"**Regime-Based:** filtered Markov Regime {int(row.regime)} → {exposures[row.regime]:.2%}. "
-                f"**ML Hard:** predicted next-session Regime {int(row.regime_pred)} → {exposures[row.regime_pred]:.2%}.")
+    st.markdown(f"**Regime-Based:** filtered Markov {risk_label(label_by_id[row.regime])} → {exposures[row.regime]:.2%}. "
+                f"**ML Hard:** predicted next-session {risk_label(label_by_id[row.regime_pred])} → {exposures[row.regime_pred]:.2%}.")
     terms = [f"{row[f'proba_{int(item.regime)}']:.6f} × {item.target_exposure:.6f}" for item in mapping.itertuples()]
     st.markdown('**ML Probability-Weighted:** Σ P(next-session state) × CVaR target = ' +
                 ' + '.join(terms) + f' = {row.target_exposure_ml_proba:.2%}.')
@@ -1615,7 +1725,9 @@ def render_decision_explorer():
 
 
 def render_strategy_results():
-    st.subheader("MAIN v1 Strategy Performance")
+    st.subheader("Historical Strategy Performance")
+    st.write("Compare returns with the risk taken to achieve them. Defensive exposure may reduce some losses and also miss market gains. Use gross and net results to assess the effect of trading costs.")
+    render_strategy_explanations()
     payload = fetch_backtesting_endpoint_safe('/backtesting/comparison', {}, 'versioned strategy performance')
     if not isinstance(payload, dict) or not payload.get('results') or not payload.get('metrics'):
         st.info("A complete validated operational strategy comparison is unavailable. Academic references remain in Research.")
@@ -1624,13 +1736,13 @@ def render_strategy_results():
     frame = pd.DataFrame(payload['results']).set_index('date')
     frame.index = pd.to_datetime(frame.index)
     metrics = pd.DataFrame(payload['metrics'])
-    st.caption(f"Frozen Engine: {publication.get('model_version', 'N/A')} · "
-               f"Publication Version: {publication.get('version', 'N/A')}")
+    TECHNICAL_PUBLICATIONS['Performance'] = publication
+    TECHNICAL_PUBLICATIONS['Performance Conventions'] = payload.get('conventions', {})
     st.caption(f"Common Evaluation Period: {frame.index.min():%Y-%m-%d} to {frame.index.max():%Y-%m-%d} · "
                f"{len(frame):,} Market Sessions · Data Freshness: {publication.get('freshness', 'unverified').title()}")
     if not publication.get('is_current'):
         st.warning("Historical performance from a stale or non-current publication; this is not a current trading signal.")
-    st.caption("Frozen MAIN Markov parameters, causal-v1 XGBoost and training-only CVaR exposure mapping. "
+    st.caption("Historical exposure uses frozen models and a training-only CVaR mapping. "
                "Prior-close targets apply once to the next available market return; the first signal date has no realised result.")
     options = {'Buy & Hold': ('benchmark', 'Buy & Hold'), 'Regime-Based': ('regime_based', 'Regime-based'),
                'ML Hard': ('ml_hard', 'ML Hard'), 'ML Probability-Weighted': ('ml_proba', 'ML Probability-Weighted')}
@@ -1642,9 +1754,6 @@ def render_strategy_results():
     st.caption(f"Costs: {rate_label} × absolute change in applied exposure, deducted from daily log returns. "
                "Initial entry and final liquidation are excluded. Buy & Hold has no modelled trading costs. "
                "Cash earns zero; financing, slippage and taxes are excluded. Gross performance excludes transaction costs.")
-    st.caption("Growth uses exp(cumulative log returns); exposed log return = exposure × index log return. "
-               "Volatility uses sample daily standard deviation × √252. Expected Shortfall is the mean daily log return "
-               "at or below the empirical 5th percentile. Drawdown uses observed running peaks, excluding an initial capital anchor.")
     if not selected:
         st.info('Select at least one strategy to display performance.')
         return
@@ -1659,21 +1768,15 @@ def render_strategy_results():
         growth[legend] = curve
         drawdown[legend] = curve / curve.cummax() - 1
         exposure[label] = pd.Series(1., index=frame.index) if is_benchmark else frame[f'strategy_exposure_{key}']
-        metric_label = stored_label if is_benchmark else stored_label + (' net of costs' if net else ' gross')
-        row = metrics.loc[metrics.strategy == metric_label].iloc[0]
-        rows.append({'Strategy': legend, 'Total Return': row.total_return,
-                     'Annualized Volatility': row.annualized_volatility, 'Expected Shortfall (95%)': row.CVaR_95,
-                     'Maximum Drawdown': row.max_drawdown, 'Total Transaction Costs (Log Return)': row.total_transaction_cost})
+    rows = performance_summary(metrics, net, selected)
     st.markdown(f'**Cumulative Growth · {basis}**')
     st.line_chart(pd.DataFrame(growth), use_container_width=True)
     st.markdown(f'**Drawdown Comparison · {basis}**')
     st.line_chart(pd.DataFrame(drawdown), use_container_width=True)
     st.markdown('**Historical Applied Exposure**')
     st.line_chart(pd.DataFrame(exposure), use_container_width=True)
-    display = pd.DataFrame(rows)
-    for column in display.columns[1:]:
-        display[column] = display[column].map(lambda value: f'{value:.2%}')
-    st.dataframe(display, use_container_width=True, hide_index=True)
+    render_performance_reading(performance_summary(metrics, net), selected, payload, net)
+    render_comparison_table(rows)
     st.caption('Transaction costs are summed log-return deductions, not a cash invoice or compounded performance drag.')
     turnover = pd.DataFrame(payload.get('turnover', []))
     if not turnover.empty:
@@ -1803,24 +1906,6 @@ def render_academic_results():
             st.dataframe(presentation_frame(backtest_results.tail(250)), use_container_width=True, hide_index=True)
 
 
-enter = st.query_params.get("enter", "0")
-
-if enter != "1":
-    show_landing()
-    st.stop()
-
-left_btn, right_btn = st.columns([1, 6])
-
-with left_btn:
-    if st.button("Home"):
-        st.query_params.clear()
-        st.rerun()
-
-with right_btn:
-    st.button("Update Market Data", disabled=True,
-              help="Market updates are disabled until a protected update workflow is configured.")
-    st.caption("Market updates are disabled. No automated update workflow is configured.")
-
 data = None
 try:
     data = load_latest_data()
@@ -1830,7 +1915,7 @@ except requests.HTTPError as exc:
     else:
         st.warning("FastAPI could not return operational results.")
 except (requests.RequestException, ValueError):
-    st.warning(f"FastAPI is unavailable or returned an invalid response. API: {API_URL}")
+    st.warning("Market data is unavailable or could not be verified. Other views remain available.")
 
 try:
     df = load_historical_data()
@@ -1850,478 +1935,540 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-pages = ["Monitor", "Explore", "Results", "Models", "Research", "Tail Risk"]
-requested_page = st.query_params.get("view", "Monitor")
-tab_options = {}
-if "default" in inspect.signature(st.tabs).parameters:
-    tab_options["default"] = requested_page if requested_page in pages else "Monitor"
-sections = dict(zip(pages, st.tabs(pages, **tab_options)))
+PAGES = ["Welcome / Home", "Overview", "Performance", "Investment Simulator", "Risk Monitor", "Research & Methodology"]
+LEGACY_PAGES = {"Monitor": "Risk Monitor", "Explore": "Risk Monitor", "Results": "Performance",
+                "Models": "Research & Methodology", "Research": "Research & Methodology", "Tail Risk": "Research & Methodology"}
 
-with sections["Monitor"]:
-    if data:
-        render_operational_overview(data)
-        st.caption("Published Session Risk Metrics")
-        for col, key, label in zip(st.columns(3), ["cvar_95_60d", "drawdown", "vol_20d"],
-                                  ["Expected Shortfall (CVaR) · 95%, 60 Sessions", "Drawdown", "20-Session Volatility"]):
-            item = data.get(key)
-            col.metric(label, f"{item:.2%}" if item is not None else "N/A")
-    if data and data.get("publication") and not df.empty:
-        monitor_history = df[df.date <= pd.Timestamp(data["date"])]
-        st.caption("Recent published history · the final observation may be stale; see Data Freshness above.")
-        render_price_regimes(monitor_history.tail(90))
-    if data and data.get("risk_score") is not None:
-        with st.expander("Legacy descriptive indicator · historical reference"):
-            st.markdown('<div class="section-title">Historical Market State</div>', unsafe_allow_html=True)
-            risk_level_text = str(data.get("risk_level", "")).capitalize() if data.get("risk_level") else "N/A"
 
-            regime_cols = st.columns([20, 1])
-            with regime_cols[0]:
-                render_status_box(data["regime_label"], data["risk_score"])
-            with regime_cols[1]:
-                info_popover(
-                    "Market Regime",
-                    "The regime groups market conditions into interpretable Low Risk, Medium Risk and High Risk states."
+def select_page(page=None):
+    page = page or st.session_state.primary_section
+    st.session_state.current_page = page
+    st.session_state.primary_section = page
+    st.query_params["view"] = page
+
+
+# Keep section widget values when conditional rendering temporarily removes them.
+# Streamlit otherwise cleans up state belonging to widgets absent from a run.
+for widget_key in (
+    "sim_capital", "sim_strategy", "sim_start", "sim_end", "sim_basis",
+    "performance_strategies", "performance_basis", "decision_session",
+    "decision_chart_strategy", "explore_period", "historical_metric_selector",
+    "backtesting_sample_selector", "figure_selector", "regime_split_selector",
+    "tail_sample_selector",
+):
+    if widget_key in st.session_state:
+        st.session_state[widget_key] = st.session_state[widget_key]
+
+requested_page = st.query_params.get("view", "Welcome / Home")
+requested_page = LEGACY_PAGES.get(requested_page, requested_page)
+current_page = requested_page if requested_page in PAGES else PAGES[0]
+st.session_state.current_page = current_page
+sections = {}
+if current_page == "Welcome / Home":
+    show_landing()
+else:
+    st.button("Home", key="home", on_click=select_page, args=(PAGES[0],))
+    st.session_state.primary_section = current_page
+    st.radio("Sections", PAGES[1:], key="primary_section", horizontal=True,
+             on_change=select_page, label_visibility="collapsed")
+    if current_page == "Overview":
+        show_overview()
+    elif current_page == "Performance":
+        sections["Results"] = st.container()
+    elif current_page == "Investment Simulator":
+        st.info("Explore the trade-off: lower exposure may soften losses and volatility, but can miss gains and rebounds. Compare with Buy & Hold; historical results do not guarantee future outcomes.")
+        render_investment_simulator(API_URL, load_decision_history, TECHNICAL_PUBLICATIONS)
+    elif current_page == "Risk Monitor":
+        st.caption("Read current-state estimates alongside next-session forecasts. Exposure is the share allocated to the index; probabilities express uncertainty. Always check the publication date and freshness before interpreting these observations.")
+        sections.update(zip(["Monitor", "Explore"], st.tabs(["Market Risk", "History & Decision Explorer"])))
+    elif current_page == "Research & Methodology":
+        sections.update(zip(["Models", "Tail Risk", "Research"],
+                            st.tabs(["Models", "Tail Risk", "Original TFM Research"])))
+
+if "Monitor" in sections:
+    with sections["Monitor"]:
+        if data:
+            render_operational_overview(data)
+            st.caption("Published Session Risk Metrics")
+            for col, key, label in zip(st.columns(3), ["cvar_95_60d", "drawdown", "vol_20d"],
+                                      ["Expected Shortfall (CVaR) · 95%, 60 Sessions", "Drawdown", "20-Session Volatility"]):
+                item = data.get(key)
+                col.metric(label, f"{item:.2%}" if item is not None else "N/A")
+        if data and data.get("publication") and not df.empty:
+            monitor_history = df[df.date <= pd.Timestamp(data["date"])]
+            st.caption("Recent published history · the final observation may be stale; see Data Freshness above.")
+            render_price_regimes(monitor_history.tail(90))
+        if data and data.get("risk_score") is not None:
+            with st.expander("Legacy descriptive indicator · historical reference"):
+                st.markdown('<div class="section-title">Historical Market State</div>', unsafe_allow_html=True)
+                risk_level_text = str(data.get("risk_level", "")).capitalize() if data.get("risk_level") else "N/A"
+
+                regime_cols = st.columns([20, 1])
+                with regime_cols[0]:
+                    render_status_box(data["regime_label"], data["risk_score"])
+                with regime_cols[1]:
+                    info_popover(
+                        "Market Regime",
+                        "The regime groups market conditions into interpretable Low Risk, Medium Risk and High Risk states."
+                    )
+
+                metric_labels = [
+                    "Expected Shortfall (CVaR) · 95%, 60 Sessions",
+                    "Drawdown",
+                    "20-Session Volatility",
+                    "Relative Risk Score",
+                ]
+                metric_values = [
+                    f"{data['cvar_95_60d']:.2%}",
+                    f"{data['drawdown']:.2%}",
+                    f"{data['vol_20d']:.2%}",
+                    f"{int(data['risk_score'])} / 100 · {risk_level_text}",
+                ]
+                metric_notes = [
+                    "Expected loss in adverse scenarios.",
+                    "Decline from the latest peak.",
+                    "Recent market variability.",
+                    "Aggregate relative risk conditions.",
+                ]
+                metric_infos = [
+                    (
+                        "CVaR",
+                        "Expected Shortfall (CVaR) measures average tail loss beyond the VaR threshold."
+                    ),
+                    (
+                        "Drawdown",
+                        "Drawdown measures the decline from the recent market peak and shows persistent losses."
+                    ),
+                    (
+                        "20-Session Volatility",
+                        "20-session volatility measures recent return variability. Higher values indicate greater instability."
+                    ),
+                    (
+                        "Relative Risk Score",
+                        "The legacy score uses expanding historical percentiles of EWMA volatility, CVaR, drawdown and downside volatility. Values range from 0 (low relative risk) to 100 (extreme relative risk). It does not forecast returns or provide trading signals."
+                    ),
+                ]
+
+                cols = st.columns(4)
+                for i, col in enumerate(cols):
+                    with col:
+                        inner_left, inner_right = st.columns([8, 1])
+                        with inner_left:
+                            metric_card(metric_labels[i], metric_values[i], metric_notes[i])
+                        with inner_right:
+                            info_popover(metric_infos[i][0], metric_infos[i][1])
+
+                panel_header(
+                    "How to Read This View",
+                    "Interpretation",
+                    "This legacy view summarises relative historical risk on a 0–100 scale. Higher values indicate more extreme conditions relative to prior observations."
                 )
 
-            metric_labels = [
-                "Expected Shortfall (CVaR) · 95%, 60 Sessions",
-                "Drawdown",
-                "20-Session Volatility",
-                "Relative Risk Score",
-            ]
-            metric_values = [
-                f"{data['cvar_95_60d']:.2%}",
-                f"{data['drawdown']:.2%}",
-                f"{data['vol_20d']:.2%}",
-                f"{int(data['risk_score'])} / 100 · {risk_level_text}",
-            ]
-            metric_notes = [
-                "Expected loss in adverse scenarios.",
-                "Decline from the latest peak.",
-                "Recent market variability.",
-                "Aggregate relative risk conditions.",
-            ]
-            metric_infos = [
-                (
-                    "CVaR",
-                    "Expected Shortfall (CVaR) measures average tail loss beyond the VaR threshold."
-                ),
-                (
-                    "Drawdown",
-                    "Drawdown measures the decline from the recent market peak and shows persistent losses."
-                ),
-                (
-                    "20-Session Volatility",
-                    "20-session volatility measures recent return variability. Higher values indicate greater instability."
-                ),
-                (
-                    "Relative Risk Score",
-                    "The legacy score uses expanding historical percentiles of EWMA volatility, CVaR, drawdown and downside volatility. Values range from 0 (low relative risk) to 100 (extreme relative risk). It does not forecast returns or provide trading signals."
-                ),
-            ]
+                if data["risk_score"] > 70:
+                    st.warning("The evaluated session indicates elevated relative risk.")
+                elif data["risk_score"] > 40:
+                    st.info("The evaluated session indicates moderate risk and instability.")
+                else:
+                    st.success("The evaluated session indicates relatively contained risk.")
 
-            cols = st.columns(4)
-            for i, col in enumerate(cols):
-                with col:
-                    inner_left, inner_right = st.columns([8, 1])
-                    with inner_left:
-                        metric_card(metric_labels[i], metric_values[i], metric_notes[i])
-                    with inner_right:
-                        info_popover(metric_infos[i][0], metric_infos[i][1])
+                st.progress(max(0.0, min(float(data["risk_score"]) / 100, 1.0)))
+                st.caption("Relative historical score intensity.")
 
+if "Explore" in sections:
+    with sections["Explore"]:
+        render_decision_explorer()
+        st.info("Historical MAIN publication data; this history is not a current signal.")
+        df = select_period(df, "explore_period")
+        explore_signals = prepare_regime_history(fetch_regime_endpoint_safe(
+            "/regimes/history?split=MAIN&limit=all", [], "MAIN regime history"))
+        if not explore_signals.empty and not df.empty:
+            explore_signals = explore_signals[explore_signals["date"].between(df.date.min(), df.date.max())]
+        render_price_regimes(df)
+        if not explore_signals.empty:
+            st.subheader("Historical Regime Probabilities")
+            st.area_chart(explore_signals.set_index("date")[["p_regime_0", "p_regime_1", "p_regime_2"]]
+                          .rename(columns={f"p_regime_{i}": risk_label({0: "low_risk", 1: "high_risk", 2: "medium_risk"}[i]) for i in range(3)}))
+        exposure = prepare_backtest_results(fetch_backtesting_endpoint_safe(
+            "/backtesting/results?sample=main", [], "MAIN exposure history"))
+        if not exposure.empty and not df.empty:
+            exposure = exposure[exposure.date.between(df.date.min(), df.date.max())]
+            st.subheader("Adaptive Portfolio Exposure")
+            st.line_chart(exposure.set_index("date")[["strategy_exposure", "target_exposure"]]
+                          .rename(columns={"strategy_exposure": "Applied Exposure", "target_exposure": "Target Portfolio Exposure"}))
+        historical_metric_options = [
+            {
+                "label": "Relative Risk Score",
+                "column": "risk_score",
+                "title": "Historical Relative Risk Score",
+                "info_title": "Historical Relative Risk Score",
+                "info_text": "Historical relative risk score showing deterioration, normalisation and persistent stress.",
+                "caption": "Historical relative risk score.",
+            },
+            {
+                "label": "Expected Shortfall (CVaR) · 95%, 60 Sessions",
+                "column": "cvar_95_60d",
+                "title": "CVaR (95%, 60d)",
+                "info_title": "Historical Expected Shortfall (CVaR)",
+                "info_text": "Rolling Expected Shortfall (CVaR). More negative values indicate more severe average tail losses.",
+                "caption": "Historical tail risk.",
+            },
+            {
+                "label": "20-Session Volatility",
+                "column": "vol_20d",
+                "title": "20-Session Volatility",
+                "info_title": "Historical Volatility",
+                "info_text": "Realised volatility over 20 trading sessions tracks recent market instability.",
+                "caption": "Historical market variability.",
+            },
+            {
+                "label": "Drawdown",
+                "column": "drawdown",
+                "title": "Drawdown",
+                "info_title": "Historical Drawdown",
+                "info_text": "Drawdown tracks cumulative losses from the most recent peak and highlights prolonged declines.",
+                "caption": "Cumulative losses from previous peaks.",
+            },
+            {
+                "label": "Skewness",
+                "column": "skew_60d",
+                "title": "Skewness (60 Sessions)",
+                "info_title": "Historical Skewness",
+                "info_text": "Skewness describes the asymmetry of returns. Negative skewness indicates a heavier left tail.",
+                "caption": "Return distribution skewness.",
+            },
+        ]
+
+        available_historical_metrics = [
+            metric for metric in historical_metric_options if metric["column"] in df.columns and df[metric["column"]].notna().any()
+        ]
+
+        if available_historical_metrics:
+            selected_historical_label = st.radio(
+                "Historical Metric",
+                [metric["label"] for metric in available_historical_metrics],
+                horizontal=True,
+                key="historical_metric_selector",
+            )
+            selected_historical_metric = next(
+                metric
+                for metric in available_historical_metrics
+                if metric["label"] == selected_historical_label
+            )
             panel_header(
-                "How to Read This View",
-                "Interpretation",
-                "This legacy view summarises relative historical risk on a 0–100 scale. Higher values indicate more extreme conditions relative to prior observations."
+                selected_historical_metric["title"],
+                selected_historical_metric["info_title"],
+                selected_historical_metric["info_text"],
+            )
+            st.line_chart(
+                df.set_index("date")[[selected_historical_metric["column"]]].rename(columns={selected_historical_metric["column"]: selected_historical_metric["label"]}),
+                use_container_width=True,
+            )
+            st.caption(selected_historical_metric["caption"])
+        else:
+            st.warning("No historical series are available in this view.")
+
+if "Research" in sections:
+    with sections["Research"]:
+        st.info("Historical research and evaluation. MAIN versioned results shown here are historical. Consult Risk Monitor for operational signals; ROBUST is an academic reference only.")
+        with st.expander("Academic Reference — Original TFM Methodology"):
+            render_academic_results()
+        figure_options = {
+            "Daily Returns": {
+                "path": FIGURES_DIR / "daily_returns_ibex35.png",
+                "info": "Daily IBEX 35 returns highlight volatility episodes and abrupt market changes."
+            },
+            "Volatility vs Downside Volatility (60 Sessions)": {
+                "path": FIGURES_DIR / "volatility_vs_downside_60d.png",
+                "info": "Total volatility compared with downside volatility helps identify instability driven by negative returns."
+            },
+            "VaR and CVaR (60 Sessions)": {
+                "path": FIGURES_DIR / "var_cvar_60d.png",
+                "info": "VaR and CVaR describe tail risk. A wide gap indicates particularly severe extreme losses."
+            },
+            "Drawdown": {
+                "path": FIGURES_DIR / "drawdown_ibex35.png",
+                "info": "Index losses from previous peaks show the depth and duration of market declines."
+            },
+            "Skewness (60 Sessions)": {
+                "path": FIGURES_DIR / "skew_60d_series.png",
+                "info": "Historical return skewness. Persistent negative skewness may indicate more fragile conditions."
+            },
+            "Risk-Adjusted Return (60 Sessions)": {
+                "path": FIGURES_DIR / "ret_risk_60d_series.png",
+                "info": "Rolling risk-adjusted returns show how recent performance relates to realised volatility."
+            },
+        }
+
+        st.subheader("Research")
+
+        selected_figure = st.radio(
+            "Figure",
+            list(figure_options.keys()),
+            horizontal=True,
+            key="figure_selector",
+        )
+        selected_path = figure_options[selected_figure]["path"]
+        st.caption(figure_options[selected_figure]["info"])
+
+        if selected_path.exists():
+            with open(selected_path, "rb") as f:
+                image_bytes = f.read()
+
+            st.image(image_bytes, caption=selected_figure, use_container_width=True)
+            st.caption(
+                f"Figure Last Modified: {pd.to_datetime(selected_path.stat().st_mtime, unit='s')}"
+            )
+        else:
+            st.warning(f"Research figure unavailable: {selected_path}")
+
+if "Models" in sections:
+    with sections["Models"]:
+        st.info("Historical research and evaluation. MAIN versioned results shown here are historical. Consult Risk Monitor for operational signals; ROBUST is an academic reference only.")
+        st.subheader("Models")
+        st.markdown("**Markov** estimates the Current Market Regime using filtered probabilities. "
+                    "**XGBoost** provides the Next-Session Regime Forecast. "
+                    "**Expected Shortfall (CVaR)** measures average loss beyond the VaR threshold. "
+                    "Model Confidence describes probability concentration, not guaranteed accuracy.")
+        st.subheader("Markov Regimes")
+
+        if hasattr(st, "segmented_control"):
+            split_selected = st.segmented_control(
+                "Evaluation Split",
+                ["MAIN", "ROBUST"],
+                default="MAIN",
+                key="regime_split_selector",
+            )
+        else:
+            split_selected = st.radio(
+                "Evaluation Split",
+                ["MAIN", "ROBUST"],
+                horizontal=True,
+                key="regime_split_selector",
+            )
+        split_selected = split_selected or "MAIN"
+        render_split_badge(split_selected)
+
+        latest_selected = fetch_regime_endpoint_safe(
+            f"/regimes/latest?split={split_selected}",
+            {},
+            "the last evaluated regime",
+        )
+        history_120 = prepare_regime_history(
+            fetch_regime_endpoint_safe(
+                f"/regimes/history?split={split_selected}&limit=120",
+                [],
+                "filtered probabilities",
+            )
+        )
+        history_250 = prepare_regime_history(
+            fetch_regime_endpoint_safe(
+                f"/regimes/history?split={split_selected}&limit=250",
+                [],
+                "regime history",
+            )
+        )
+        transitions_selected = fetch_regime_endpoint_safe(
+            f"/regimes/transitions?split={split_selected}",
+            [],
+            "the transition matrix",
+        )
+        durations_selected = fetch_regime_endpoint_safe(
+            f"/regimes/durations?split={split_selected}&scope=FULL_FILTERED",
+            [],
+            "regime duration",
+        )
+        summary_records = fetch_regime_endpoint_safe(
+            "/regimes/summary",
+            [],
+            "the MAIN vs ROBUST comparison",
+        )
+
+        st.markdown('<div class="section-title">Last Evaluated Regime</div>', unsafe_allow_html=True)
+        render_regime_card(split_selected, latest_selected)
+
+        st.markdown('<div class="section-title">Filtered Probabilities</div>', unsafe_allow_html=True)
+        st.caption("Filtered Markov Switching probabilities")
+        if history_120.empty:
+            st.info("No historical probabilities are available.")
+        else:
+            probability_df = history_120.set_index("date")[
+                ["p_regime_0", "p_regime_1", "p_regime_2"]
+            ]
+            split_labels = {int(row['regime']): risk_label(row['economic_label'])
+                            for row in summary_records if row.get('split') == split_selected}
+            st.area_chart(probability_df.rename(columns={f"p_regime_{i}": split_labels.get(i, f"Regime {i}")
+                                                        for i in range(3)}), use_container_width=True)
+
+        st.markdown('<div class="section-title">Recent Regime History</div>', unsafe_allow_html=True)
+        if history_250.empty:
+            st.info("No regime history is available.")
+        else:
+            render_regime_timeline(history_250)
+
+        st.markdown('<div class="section-title">Model Confidence</div>', unsafe_allow_html=True)
+        uncertainty_col, uncertainty_chart_col = st.columns([1, 2])
+        with uncertainty_col:
+            render_uncertainty_card(split_selected, latest_selected)
+        with uncertainty_chart_col:
+            render_uncertainty_chart(history_250)
+            st.caption(
+                "Descriptive confidence thresholds: high from 80%, moderate from 60% to 80%, and transition below 60%. These are not calibrated forecast accuracy estimates."
             )
 
-            if data["risk_score"] > 70:
-                st.warning("The evaluated session indicates elevated relative risk.")
-            elif data["risk_score"] > 40:
-                st.info("The evaluated session indicates moderate risk and instability.")
-            else:
-                st.success("The evaluated session indicates relatively contained risk.")
+        heatmap_col, duration_col = st.columns(2)
+        with heatmap_col:
+            st.markdown('<div class="section-title">Transition Heatmap</div>', unsafe_allow_html=True)
+            render_transition_heatmap(transitions_selected)
+            st.caption(
+                "High diagonal transition probabilities indicate regime persistence."
+            )
 
-            st.progress(max(0.0, min(float(data["risk_score"]) / 100, 1.0)))
-            st.caption("Relative historical score intensity.")
+        with duration_col:
+            st.markdown('<div class="section-title">Regime Persistence / Duration</div>', unsafe_allow_html=True)
+            render_duration_bars(durations_selected)
+            st.caption("Average length of consecutive regime episodes in trading sessions.")
 
-with sections["Explore"]:
-    render_decision_explorer()
-    st.info("Historical MAIN publication data; this history is not a current signal.")
-    df = select_period(df, "explore_period")
-    explore_signals = prepare_regime_history(fetch_regime_endpoint_safe(
-        "/regimes/history?split=MAIN&limit=all", [], "MAIN regime history"))
-    if not explore_signals.empty and not df.empty:
-        explore_signals = explore_signals[explore_signals["date"].between(df.date.min(), df.date.max())]
-    render_price_regimes(df)
-    if not explore_signals.empty:
-        st.subheader("Historical Regime Probabilities")
-        st.area_chart(explore_signals.set_index("date")[["p_regime_0", "p_regime_1", "p_regime_2"]]
-                      .rename(columns={f"p_regime_{i}": f"Regime {i}" for i in range(3)}))
-    exposure = prepare_backtest_results(fetch_backtesting_endpoint_safe(
-        "/backtesting/results?sample=main", [], "MAIN exposure history"))
-    if not exposure.empty and not df.empty:
-        exposure = exposure[exposure.date.between(df.date.min(), df.date.max())]
-        st.subheader("Adaptive Portfolio Exposure")
-        st.line_chart(exposure.set_index("date")[["strategy_exposure", "target_exposure"]]
-                      .rename(columns={"strategy_exposure": "Applied Exposure", "target_exposure": "Target Portfolio Exposure"}))
-    historical_metric_options = [
-        {
-            "label": "Relative Risk Score",
-            "column": "risk_score",
-            "title": "Historical Relative Risk Score",
-            "info_title": "Historical Relative Risk Score",
-            "info_text": "Historical relative risk score showing deterioration, normalisation and persistent stress.",
-            "caption": "Historical relative risk score.",
-        },
-        {
-            "label": "Expected Shortfall (CVaR) · 95%, 60 Sessions",
-            "column": "cvar_95_60d",
-            "title": "CVaR (95%, 60d)",
-            "info_title": "Historical Expected Shortfall (CVaR)",
-            "info_text": "Rolling Expected Shortfall (CVaR). More negative values indicate more severe average tail losses.",
-            "caption": "Historical tail risk.",
-        },
-        {
-            "label": "20-Session Volatility",
-            "column": "vol_20d",
-            "title": "20-Session Volatility",
-            "info_title": "Historical Volatility",
-            "info_text": "Realised volatility over 20 trading sessions tracks recent market instability.",
-            "caption": "Historical market variability.",
-        },
-        {
-            "label": "Drawdown",
-            "column": "drawdown",
-            "title": "Drawdown",
-            "info_title": "Historical Drawdown",
-            "info_text": "Drawdown tracks cumulative losses from the most recent peak and highlights prolonged declines.",
-            "caption": "Cumulative losses from previous peaks.",
-        },
-        {
-            "label": "Skewness",
-            "column": "skew_60d",
-            "title": "Skewness (60 Sessions)",
-            "info_title": "Historical Skewness",
-            "info_text": "Skewness describes the asymmetry of returns. Negative skewness indicates a heavier left tail.",
-            "caption": "Return distribution skewness.",
-        },
-    ]
+        st.markdown('<div class="section-title">MAIN vs ROBUST Comparison</div>', unsafe_allow_html=True)
+        summary_df = pd.DataFrame(summary_records)
+        if summary_df.empty:
+            st.info("No regime summary is available.")
+        else:
+            comparison_df = summary_df[
+                [
+                    "split",
+                    "economic_label",
+                    "frequency_pct",
+                    "mean_ewma_vol",
+                    "mean_cvar_95_60d",
+                ]
+            ].copy()
+            comparison_df["frequency_pct"] = comparison_df["frequency_pct"].map(
+                lambda value: f"{float(value):.1%}"
+            )
+            comparison_df["mean_ewma_vol"] = comparison_df["mean_ewma_vol"].map(
+                lambda value: f"{float(value):.2%}"
+            )
+            comparison_df["mean_cvar_95_60d"] = comparison_df["mean_cvar_95_60d"].map(
+                lambda value: f"{float(value):.2%}"
+            )
+            st.dataframe(presentation_frame(comparison_df), use_container_width=True, hide_index=True)
 
-    available_historical_metrics = [
-        metric for metric in historical_metric_options if metric["column"] in df.columns and df[metric["column"]].notna().any()
-    ]
+if "Results" in sections:
+    with sections["Results"]:
+        render_strategy_results()
 
-    if available_historical_metrics:
-        selected_historical_label = st.radio(
-            "Historical Metric",
-            [metric["label"] for metric in available_historical_metrics],
-            horizontal=True,
-            key="historical_metric_selector",
-        )
-        selected_historical_metric = next(
-            metric
-            for metric in available_historical_metrics
-            if metric["label"] == selected_historical_label
-        )
-        panel_header(
-            selected_historical_metric["title"],
-            selected_historical_metric["info_title"],
-            selected_historical_metric["info_text"],
-        )
-        st.line_chart(
-            df.set_index("date")[[selected_historical_metric["column"]]].rename(columns={selected_historical_metric["column"]: selected_historical_metric["label"]}),
-            use_container_width=True,
-        )
-        st.caption(selected_historical_metric["caption"])
-    else:
-        st.warning("No historical series are available in this view.")
-
-with sections["Research"]:
-    st.info("Historical research and evaluation. MAIN versioned results shown here are historical. Consult Monitor for operational signals; ROBUST is an academic reference only.")
-    with st.expander("Academic Reference — Original TFM Methodology"):
-        render_academic_results()
-    figure_options = {
-        "Daily Returns": {
-            "path": FIGURES_DIR / "daily_returns_ibex35.png",
-            "info": "Daily IBEX 35 returns highlight volatility episodes and abrupt market changes."
-        },
-        "Volatility vs Downside Volatility (60 Sessions)": {
-            "path": FIGURES_DIR / "volatility_vs_downside_60d.png",
-            "info": "Total volatility compared with downside volatility helps identify instability driven by negative returns."
-        },
-        "VaR and CVaR (60 Sessions)": {
-            "path": FIGURES_DIR / "var_cvar_60d.png",
-            "info": "VaR and CVaR describe tail risk. A wide gap indicates particularly severe extreme losses."
-        },
-        "Drawdown": {
-            "path": FIGURES_DIR / "drawdown_ibex35.png",
-            "info": "Index losses from previous peaks show the depth and duration of market declines."
-        },
-        "Skewness (60 Sessions)": {
-            "path": FIGURES_DIR / "skew_60d_series.png",
-            "info": "Historical return skewness. Persistent negative skewness may indicate more fragile conditions."
-        },
-        "Risk-Adjusted Return (60 Sessions)": {
-            "path": FIGURES_DIR / "ret_risk_60d_series.png",
-            "info": "Rolling risk-adjusted returns show how recent performance relates to realised volatility."
-        },
-    }
-
-    st.subheader("Research")
-
-    selected_figure = st.radio(
-        "Figure",
-        list(figure_options.keys()),
-        horizontal=True,
-        key="figure_selector",
-    )
-    selected_path = figure_options[selected_figure]["path"]
-    st.caption(figure_options[selected_figure]["info"])
-
-    if selected_path.exists():
-        with open(selected_path, "rb") as f:
-            image_bytes = f.read()
-
-        st.image(image_bytes, caption=selected_figure, use_container_width=True)
-        st.caption(
-            f"Figure Last Modified: {pd.to_datetime(selected_path.stat().st_mtime, unit='s')}"
-        )
-    else:
-        st.warning(f"Research figure unavailable: {selected_path}")
-
-with sections["Models"]:
-    st.info("Historical research and evaluation. MAIN versioned results shown here are historical. Consult Monitor for operational signals; ROBUST is an academic reference only.")
-    st.subheader("Models")
-    st.markdown("**Markov** estimates the Current Market Regime using filtered probabilities. "
-                "**XGBoost** provides the Next-Session Regime Forecast. "
-                "**Expected Shortfall (CVaR)** measures average loss beyond the VaR threshold. "
-                "Model Confidence describes probability concentration, not guaranteed accuracy.")
-    st.subheader("Markov Regimes")
-
-    if hasattr(st, "segmented_control"):
-        split_selected = st.segmented_control(
-            "Evaluation Split",
-            ["MAIN", "ROBUST"],
-            default="MAIN",
-            key="regime_split_selector",
-        )
-    else:
-        split_selected = st.radio(
-            "Evaluation Split",
-            ["MAIN", "ROBUST"],
-            horizontal=True,
-            key="regime_split_selector",
-        )
-    split_selected = split_selected or "MAIN"
-    render_split_badge(split_selected)
-
-    latest_selected = fetch_regime_endpoint_safe(
-        f"/regimes/latest?split={split_selected}",
-        {},
-        "the last evaluated regime",
-    )
-    history_120 = prepare_regime_history(
-        fetch_regime_endpoint_safe(
-            f"/regimes/history?split={split_selected}&limit=120",
-            [],
-            "filtered probabilities",
-        )
-    )
-    history_250 = prepare_regime_history(
-        fetch_regime_endpoint_safe(
-            f"/regimes/history?split={split_selected}&limit=250",
-            [],
-            "regime history",
-        )
-    )
-    transitions_selected = fetch_regime_endpoint_safe(
-        f"/regimes/transitions?split={split_selected}",
-        [],
-        "the transition matrix",
-    )
-    durations_selected = fetch_regime_endpoint_safe(
-        f"/regimes/durations?split={split_selected}&scope=FULL_FILTERED",
-        [],
-        "regime duration",
-    )
-    summary_records = fetch_regime_endpoint_safe(
-        "/regimes/summary",
-        [],
-        "the MAIN vs ROBUST comparison",
-    )
-
-    st.markdown('<div class="section-title">Last Evaluated Regime</div>', unsafe_allow_html=True)
-    render_regime_card(split_selected, latest_selected)
-
-    st.markdown('<div class="section-title">Filtered Probabilities</div>', unsafe_allow_html=True)
-    st.caption("Filtered Markov Switching probabilities")
-    if history_120.empty:
-        st.info("No historical probabilities are available.")
-    else:
-        probability_df = history_120.set_index("date")[
-            ["p_regime_0", "p_regime_1", "p_regime_2"]
-        ]
-        st.area_chart(probability_df.rename(columns={f"p_regime_{i}": f"Regime {i}" for i in range(3)}), use_container_width=True)
-
-    st.markdown('<div class="section-title">Recent Regime History</div>', unsafe_allow_html=True)
-    if history_250.empty:
-        st.info("No regime history is available.")
-    else:
-        render_regime_timeline(history_250)
-
-    st.markdown('<div class="section-title">Model Confidence</div>', unsafe_allow_html=True)
-    uncertainty_col, uncertainty_chart_col = st.columns([1, 2])
-    with uncertainty_col:
-        render_uncertainty_card(split_selected, latest_selected)
-    with uncertainty_chart_col:
-        render_uncertainty_chart(history_250)
-        st.caption(
-            "Descriptive confidence thresholds: high from 80%, moderate from 60% to 80%, and transition below 60%. These are not calibrated forecast accuracy estimates."
-        )
-
-    heatmap_col, duration_col = st.columns(2)
-    with heatmap_col:
-        st.markdown('<div class="section-title">Transition Heatmap</div>', unsafe_allow_html=True)
-        render_transition_heatmap(transitions_selected)
-        st.caption(
-            "High diagonal transition probabilities indicate regime persistence."
-        )
-
-    with duration_col:
-        st.markdown('<div class="section-title">Regime Persistence / Duration</div>', unsafe_allow_html=True)
-        render_duration_bars(durations_selected)
-        st.caption("Average length of consecutive regime episodes in trading sessions.")
-
-    st.markdown('<div class="section-title">MAIN vs ROBUST Comparison</div>', unsafe_allow_html=True)
-    summary_df = pd.DataFrame(summary_records)
-    if summary_df.empty:
-        st.info("No regime summary is available.")
-    else:
-        comparison_df = summary_df[
-            [
-                "split",
-                "economic_label",
-                "frequency_pct",
-                "mean_ewma_vol",
-                "mean_cvar_95_60d",
-            ]
-        ].copy()
-        comparison_df["frequency_pct"] = comparison_df["frequency_pct"].map(
-            lambda value: f"{float(value):.1%}"
-        )
-        comparison_df["mean_ewma_vol"] = comparison_df["mean_ewma_vol"].map(
-            lambda value: f"{float(value):.2%}"
-        )
-        comparison_df["mean_cvar_95_60d"] = comparison_df["mean_cvar_95_60d"].map(
-            lambda value: f"{float(value):.2%}"
-        )
-        st.dataframe(presentation_frame(comparison_df), use_container_width=True, hide_index=True)
-
-with sections["Results"]:
-    render_strategy_results()
-
-with sections["Tail Risk"]:
-    st.info("Historical research and evaluation. MAIN versioned results shown here are historical. Consult Monitor for operational signals; ROBUST is an academic reference only.")
-    st.subheader("Tail Risk")
-    st.markdown(
-        """
-        <div class="panel-box">
-            <div class="regime-card-detail">
-                Tail risk analysis evaluates Buy & Hold and the
-                adaptive strategy during the worst 5% of Out-of-Sample market sessions.
-                Extreme events are defined using market returns (<b>ret_1d</b>), so both
-                strategies are evaluated on the same stressed sessions.
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    if hasattr(st, "segmented_control"):
-        tail_sample_label = st.segmented_control(
-            "Evaluation Sample",
-            ["MAIN", "ROBUST"],
-            default="MAIN",
-            key="tail_sample_selector",
-        )
-    else:
-        tail_sample_label = st.radio(
-            "Evaluation Sample",
-            ["MAIN", "ROBUST"],
-            horizontal=True,
-            key="tail_sample_selector",
-        )
-    tail_sample_label = tail_sample_label or "MAIN"
-    tail_sample = tail_sample_label.lower()
-    render_split_badge(tail_sample_label)
-
-    tail_events = prepare_tail_events(
-        fetch_tail_endpoint_safe(
-            f"/tail-risk/events?sample={tail_sample}",
-            [],
-            f"tail events for {tail_sample_label}",
-        )
-    )
-    tail_metrics = prepare_tail_metrics(
-        fetch_tail_endpoint_safe(
-            "/tail-risk/metrics",
-            [],
-            "tail risk metrics",
-        ),
-        tail_sample_label,
-    )
-    tail_threshold = prepare_tail_threshold(
-        fetch_tail_endpoint_safe(
-            "/tail-risk/thresholds",
-            [],
-            "tail risk thresholds",
-        ),
-        tail_sample_label,
-    )
-    tail_latest = fetch_tail_endpoint_safe(
-        f"/tail-risk/latest?sample={tail_sample}",
-        {},
-        f"the last evaluated tail risk session for {tail_sample_label}",
-    )
-
-    st.markdown('<div class="section-title">Left Tail Risk Evaluation</div>', unsafe_allow_html=True)
-    render_tail_metric_cards(tail_threshold, tail_metrics)
-    render_tail_defensive_reading(tail_metrics)
-
-    st.markdown('<div class="section-title">Latest</div>', unsafe_allow_html=True)
-    render_tail_latest(tail_latest)
-
-    timeline_col, tail_cum_col = st.columns(2)
-    with timeline_col:
-        st.markdown('<div class="section-title">Extreme Event Timeline</div>', unsafe_allow_html=True)
-        render_tail_event_timeline(
-            tail_events,
-            tail_threshold.get("tail_threshold", 0.0) if tail_threshold else 0.0,
-        )
-    with tail_cum_col:
-        st.markdown('<div class="section-title">Cumulative Return on Tail Sessions</div>', unsafe_allow_html=True)
-        render_tail_cumulative_chart(tail_events)
-
-    cvar_col, regime_col = st.columns(2)
-    with cvar_col:
-        st.markdown('<div class="section-title">Tail CVaR</div>', unsafe_allow_html=True)
-        render_tail_cvar_bars(tail_metrics)
-    with regime_col:
+if "Tail Risk" in sections:
+    with sections["Tail Risk"]:
+        st.info("Historical research and evaluation. MAIN versioned results shown here are historical. Consult Risk Monitor for operational signals; ROBUST is an academic reference only.")
+        st.subheader("Tail Risk")
         st.markdown(
-            '<div class="section-title">Regime Composition During Stress</div>',
+            """
+            <div class="panel-box">
+                <div class="regime-card-detail">
+                    Tail risk analysis evaluates Buy & Hold and the
+                    adaptive strategy during the worst 5% of Out-of-Sample market sessions.
+                    Extreme events are defined using market returns (<b>ret_1d</b>), so both
+                    strategies are evaluated on the same stressed sessions.
+                </div>
+            </div>
+            """,
             unsafe_allow_html=True,
         )
-        render_tail_regime_composition(tail_events)
 
-    st.markdown('<div class="section-title">Tail Risk Metrics</div>', unsafe_allow_html=True)
-    if tail_metrics.empty:
-        st.info("No tail risk metrics are available for the selected sample.")
-    else:
-        display_tail_metrics = tail_metrics[
-            [
-                "strategy",
-                "n_tail_events",
+        if hasattr(st, "segmented_control"):
+            tail_sample_label = st.segmented_control(
+                "Evaluation Sample",
+                ["MAIN", "ROBUST"],
+                default="MAIN",
+                key="tail_sample_selector",
+            )
+        else:
+            tail_sample_label = st.radio(
+                "Evaluation Sample",
+                ["MAIN", "ROBUST"],
+                horizontal=True,
+                key="tail_sample_selector",
+            )
+        tail_sample_label = tail_sample_label or "MAIN"
+        tail_sample = tail_sample_label.lower()
+        render_split_badge(tail_sample_label)
+
+        tail_events = prepare_tail_events(
+            fetch_tail_endpoint_safe(
+                f"/tail-risk/events?sample={tail_sample}",
+                [],
+                f"tail events for {tail_sample_label}",
+            )
+        )
+        tail_metrics = prepare_tail_metrics(
+            fetch_tail_endpoint_safe(
+                "/tail-risk/metrics",
+                [],
+                "tail risk metrics",
+            ),
+            tail_sample_label,
+        )
+        tail_threshold = prepare_tail_threshold(
+            fetch_tail_endpoint_safe(
+                "/tail-risk/thresholds",
+                [],
+                "tail risk thresholds",
+            ),
+            tail_sample_label,
+        )
+        tail_latest = fetch_tail_endpoint_safe(
+            f"/tail-risk/latest?sample={tail_sample}",
+            {},
+            f"the last evaluated tail risk session for {tail_sample_label}",
+        )
+
+        st.markdown('<div class="section-title">Left Tail Risk Evaluation</div>', unsafe_allow_html=True)
+        render_tail_metric_cards(tail_threshold, tail_metrics)
+        render_tail_defensive_reading(tail_metrics)
+
+        st.markdown('<div class="section-title">Latest</div>', unsafe_allow_html=True)
+        render_tail_latest(tail_latest)
+
+        timeline_col, tail_cum_col = st.columns(2)
+        with timeline_col:
+            st.markdown('<div class="section-title">Extreme Event Timeline</div>', unsafe_allow_html=True)
+            render_tail_event_timeline(
+                tail_events,
+                tail_threshold.get("tail_threshold", 0.0) if tail_threshold else 0.0,
+            )
+        with tail_cum_col:
+            st.markdown('<div class="section-title">Cumulative Return on Tail Sessions</div>', unsafe_allow_html=True)
+            render_tail_cumulative_chart(tail_events)
+
+        cvar_col, regime_col = st.columns(2)
+        with cvar_col:
+            st.markdown('<div class="section-title">Tail CVaR</div>', unsafe_allow_html=True)
+            render_tail_cvar_bars(tail_metrics)
+        with regime_col:
+            st.markdown(
+                '<div class="section-title">Regime Composition During Stress</div>',
+                unsafe_allow_html=True,
+            )
+            render_tail_regime_composition(tail_events)
+
+        st.markdown('<div class="section-title">Tail Risk Metrics</div>', unsafe_allow_html=True)
+        if tail_metrics.empty:
+            st.info("No tail risk metrics are available for the selected sample.")
+        else:
+            display_tail_metrics = tail_metrics[
+                [
+                    "strategy",
+                    "n_tail_events",
+                    "mean_tail_return",
+                    "tail_volatility",
+                    "tail_total_return",
+                    "tail_VaR_95",
+                    "tail_CVaR_95",
+                    "max_backtest_drawdown_on_tail_days",
+                    "hit_ratio_negative",
+                ]
+            ].copy()
+            for column in [
                 "mean_tail_return",
                 "tail_volatility",
                 "tail_total_return",
@@ -2329,59 +2476,49 @@ with sections["Tail Risk"]:
                 "tail_CVaR_95",
                 "max_backtest_drawdown_on_tail_days",
                 "hit_ratio_negative",
-            ]
-        ].copy()
-        for column in [
-            "mean_tail_return",
-            "tail_volatility",
-            "tail_total_return",
-            "tail_VaR_95",
-            "tail_CVaR_95",
-            "max_backtest_drawdown_on_tail_days",
-            "hit_ratio_negative",
-        ]:
-            display_tail_metrics[column] = display_tail_metrics[column].map(
-                lambda value: f"{float(value):.2%}"
-            )
-        st.dataframe(presentation_frame(display_tail_metrics), use_container_width=True, hide_index=True)
+            ]:
+                display_tail_metrics[column] = display_tail_metrics[column].map(
+                    lambda value: f"{float(value):.2%}"
+                )
+            st.dataframe(presentation_frame(display_tail_metrics), use_container_width=True, hide_index=True)
 
-    st.markdown('<div class="section-title">Worst Sessions</div>', unsafe_allow_html=True)
-    if tail_events.empty:
-        st.info("No sessions are available.")
-    else:
-        worst_days = tail_events.sort_values("ret_1d", ascending=True).head(10)
-        worst_days = worst_days[
-            [
-                "date",
+        st.markdown('<div class="section-title">Worst Sessions</div>', unsafe_allow_html=True)
+        if tail_events.empty:
+            st.info("No sessions are available.")
+        else:
+            worst_days = tail_events.sort_values("ret_1d", ascending=True).head(10)
+            worst_days = worst_days[
+                [
+                    "date",
+                    "ret_1d",
+                    "regime_label",
+                    "strategy_exposure",
+                    "benchmark_return",
+                    "strategy_return",
+                    "benchmark_drawdown",
+                    "strategy_drawdown",
+                    "stress_tail_event",
+                ]
+            ].copy()
+            for column in [
                 "ret_1d",
-                "regime_label",
-                "strategy_exposure",
                 "benchmark_return",
                 "strategy_return",
                 "benchmark_drawdown",
                 "strategy_drawdown",
-                "stress_tail_event",
-            ]
-        ].copy()
-        for column in [
-            "ret_1d",
-            "benchmark_return",
-            "strategy_return",
-            "benchmark_drawdown",
-            "strategy_drawdown",
-        ]:
-            worst_days[column] = worst_days[column].map(lambda value: f"{float(value):.2%}")
-        worst_days["strategy_exposure"] = worst_days["strategy_exposure"].map(
-            lambda value: f"{float(value):.2f}"
-        )
-        worst_days["date"] = worst_days["date"].dt.strftime("%Y-%m-%d")
-        st.dataframe(presentation_frame(worst_days), use_container_width=True, hide_index=True)
+            ]:
+                worst_days[column] = worst_days[column].map(lambda value: f"{float(value):.2%}")
+            worst_days["strategy_exposure"] = worst_days["strategy_exposure"].map(
+                lambda value: f"{float(value):.2f}"
+            )
+            worst_days["date"] = worst_days["date"].dt.strftime("%Y-%m-%d")
+            st.dataframe(presentation_frame(worst_days), use_container_width=True, hide_index=True)
 
-st.markdown(
-    """
-    <div class="footer-note">
-        RISKBEX connects market data, risk metrics and regime analysis to monitor IBEX 35 tail risk.
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+    st.markdown(
+        """
+        <div class="footer-note">
+            RISKBEX connects market data, risk metrics and regime analysis to monitor IBEX 35 tail risk.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )

@@ -27,20 +27,41 @@ class DashboardUI(unittest.TestCase):
         self.assertEqual(len(app.exception), 0, str(app.exception))
         return app
 
-    def test_welcome_has_three_direct_links(self):
-        with patch('requests.get') as get:
-            app = self.run_app()
-            get.assert_not_called()
-        self.assertEqual(len(app.get('link_button')), 3)
-        self.assertIn('Understand risk. Adapt exposure.', ' '.join(x.value for x in app.markdown))
+    def test_welcome_and_overview_explanations(self):
+        app = self.run_app(lambda *a, **k: Mock(json=lambda: {}, raise_for_status=lambda: None))
+        self.assertEqual(app.title[0].value, 'RISKBEX')
+        self.assertTrue(any('Developed by Alejandro Palomo Morales' in x.value for x in app.markdown))
+        pages = ['Overview', 'Performance', 'Investment Simulator', 'Risk Monitor', 'Research & Methodology']
+        self.assertEqual([b.label for b in app.button], ['Explore ' + p for p in pages])
+        self.assertFalse(app.tabs)
+        self.assertFalse(app.radio)
+        self.assertFalse(app.get('link_button'))
+        self.assertTrue(any('not eliminated' in x.value for x in app.info))
+        overview = self.run_app(lambda *a, **k: Mock(json=lambda: {}, raise_for_status=lambda: None), 'Overview')
+        headings = [x.value for x in overview.subheader]
+        for heading in ['CVaR / Expected Shortfall', 'Volatility', 'Drawdown', 'Market Regimes and Machine Learning']:
+            self.assertIn(heading, headings)
+        self.assertEqual(len(overview.get('vega_lite_chart')), 2)
+        self.assertTrue(any('Market data → Risk indicators' in x.value for x in overview.markdown))
+        performance = self.run_app(lambda *a, **k: Mock(json=lambda: {}, raise_for_status=lambda: None), 'Performance')
+        self.assertTrue(any('Historical Strategy Performance' == x.value for x in performance.subheader))
+        simulator = self.run_app(lambda *a, **k: Mock(json=lambda: {}, raise_for_status=lambda: None), 'Investment Simulator')
+        self.assertTrue(any('Investment Simulator' == x.value for x in simulator.subheader))
 
-    def test_unavailable_api_keeps_all_six_sections(self):
+    def test_unavailable_api_keeps_all_content_sections(self):
         app = self.run_app(lambda *a, **k: (_ for _ in ()).throw(requests.ConnectionError('offline')), 'Monitor')
-        self.assertEqual([t.label for t in app.tabs], ['Monitor', 'Explore', 'Results', 'Models', 'Research', 'Tail Risk'])
+        self.assertEqual([t.label for t in app.tabs], ['Market Risk', 'History & Decision Explorer'])
+        self.assertEqual(app.radio(key='primary_section').options, ['Overview', 'Performance', 'Investment Simulator', 'Risk Monitor', 'Research & Methodology'])
+        self.assertEqual(app.button(key='home').label, 'Home')
+        research = self.run_app(lambda *a, **k: (_ for _ in ()).throw(requests.ConnectionError('offline')), 'Research & Methodology')
+        self.assertEqual([t.label for t in research.tabs], ['Models', 'Tail Risk', 'Original TFM Research'])
+        self.assertFalse(research.json)
+        self.assertTrue(any('Decision Explorer' == x.value for x in app.subheader))
+        self.assertTrue(any('Verified decision history is unavailable' in x.value for x in app.warning))
         self.assertTrue(app.warning)
 
     def test_publication_history_and_stale_status(self):
-        publication = dict(freshness='historical', is_current=False, expected_data_date='2026-11-06',
+        publication = dict(version='publication-hash-sentinel', model_version='package-id-sentinel', freshness='historical', is_current=False, expected_data_date='2026-11-06',
                            target_session_date='2026-04-24', generated_at='2026-04-23T20:00Z')
         history = [dict(date=d, ibex_close=100+i, regime_label='medium_risk',
                         cvar_95_60d=-.02, drawdown=-.03, vol_20d=.01, skew_60d=0,
@@ -63,6 +84,47 @@ class DashboardUI(unittest.TestCase):
         self.assertTrue(any(m.label == 'Last Market Close · IBEX 35' and m.value == '102.00' for m in app.metric))
         self.assertTrue(any(s.label == 'Observation Period' for s in app.selectbox))
         self.assertEqual(len(app.get('vega_lite_chart')) >= 2, True)
+        visible = ' '.join(x.value for x in app.markdown) + ' '.join(x.value for x in app.caption)
+        self.assertNotIn('publication-hash-sentinel', visible)
+        self.assertNotIn('package-id-sentinel', visible)
+        self.assertFalse(app.json)
+        monitor = next(t for t in app.tabs if t.label == 'Market Risk')
+        self.assertFalse(any('Regime 0' in x.value for x in monitor.markdown))
+
+    def test_card_navigation_and_home_offline(self):
+        offline = lambda *a, **k: (_ for _ in ()).throw(requests.ConnectionError('offline'))
+        app = self.run_app(offline)
+        for page in ['Overview', 'Performance', 'Investment Simulator', 'Risk Monitor', 'Research & Methodology']:
+            with patch('requests.get', side_effect=offline):
+                app.button(key='welcome_' + page).click().run()
+                self.assertFalse(app.exception, str(app.exception))
+                self.assertEqual(app.query_params['view'], [page])
+                self.assertEqual(app.radio(key='primary_section').value, page)
+                app.button(key='home').click().run()
+                self.assertFalse(app.exception, str(app.exception))
+                self.assertFalse(app.radio)
+                self.assertFalse(app.tabs)
+        with patch('requests.get', side_effect=offline):
+            app.button(key='welcome_Overview').click().run()
+            app.radio(key='primary_section').set_value('Performance').run()
+        self.assertFalse(app.exception, str(app.exception))
+        self.assertEqual(app.query_params['view'], ['Performance'])
+
+    def test_responsive_card_structure(self):
+        app = self.run_app(lambda *a, **k: Mock(json=lambda: {}, raise_for_status=lambda: None))
+        columns = app.get('column')
+        self.assertEqual(len(columns), 5)
+        for column in columns:
+            self.assertEqual(len(column.button), 1)
+            self.assertEqual(len(column.subheader), 0)
+            self.assertEqual(len(column.markdown), 2)
+        source = (ROOT / 'dashboard.py').read_text()
+        landing = source[source.index('def show_landing'):source.index('def show_overview')]
+        self.assertIn('cards[:3], cards[3:]', landing)
+        self.assertIn('st.columns(len(row), border=True)', landing)
+        self.assertIn('st.container(height="stretch")', landing)
+        self.assertNotIn('link_button', landing)
+        self.assertNotIn('window.open', source)
 
     def test_english_presentation_literals(self):
         # Inspect literal text, including HTML and f-string fragments, without matching identifiers.
@@ -72,6 +134,20 @@ class DashboardUI(unittest.TestCase):
         self.assertEqual(offenders, [])
         for filename in ['README.md', 'docs/sprint-4c.md']:
             self.assertIsNone(SPANISH.search((ROOT / filename).read_text()), filename)
+
+    def test_single_dark_theme_configuration(self):
+        import tomllib
+        configs = [ROOT / '.streamlit/config.toml', ROOT.parent / '.streamlit/config.toml']
+        self.assertEqual(configs[0].read_bytes(), configs[1].read_bytes())
+        config = tomllib.loads(configs[0].read_text())['theme']
+        self.assertEqual(config['base'], 'dark')
+        self.assertGreaterEqual(config['baseFontSize'], 16)
+        self.assertNotIn('light', config)
+        self.assertNotIn('dark', config)
+        for key in config:
+            self.assertIn('theme.' + key, st.config.get_config_options())
+        self.assertIn('COPY .streamlit ./.streamlit', (ROOT / 'Dockerfile.dashboard').read_text())
+        self.assertIn('!.streamlit/config.toml', (ROOT / '.dockerignore').read_text())
 
     def test_optional_close_preserves_historical_contract(self):
         from src.riskbex.api.schemas import HistoricalRiskPoint
