@@ -1,0 +1,36 @@
+{
+    admin off
+    http_port 8080
+    https_port 8443
+    servers {
+        protocols h1 h2
+        timeouts {
+            read_header 15s
+            idle 5m
+        }
+    }
+}
+
+{$RISKBEX_DOMAIN} {
+    header {
+        -Server
+        Strict-Transport-Security "max-age=31536000"
+        X-Content-Type-Options nosniff
+        X-Frame-Options SAMEORIGIN
+        Referrer-Policy strict-origin-when-cross-origin
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+    }
+    log {
+        output stdout
+        format json
+    }
+    reverse_proxy dashboard:8501 {
+        # Caddy handles WebSocket upgrades and forwarded headers automatically.
+        # Do not set a stream timeout: interactive WebSockets may remain open.
+        header_up X-Forwarded-For {remote_host}
+        transport http {
+            dial_timeout 5s
+            response_header_timeout 60s
+        }
+    }
+}

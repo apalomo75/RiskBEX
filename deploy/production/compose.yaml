@@ -1,0 +1,114 @@
+# Explicit override only: never auto-loaded by local Compose.
+# Requires Compose >= 2.24.4 (!reset support).
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  api:
+    image: riskbex-api:${RISKBEX_RELEASE:?Set an immutable release tag}
+    logging: *logging
+    mem_limit: 768m
+    cpus: 0.75
+    pids_limit: 128
+    volumes:
+      - type: bind
+        source: ${RISKBEX_STORE:?Set an absolute production store path}
+        target: /app/runtime/main
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${RISKBEX_HISTORICAL_DATA:?Set an absolute historical data path}
+        target: /app/data
+        read_only: true
+        bind:
+          create_host_path: false
+
+  dashboard:
+    image: riskbex-dashboard:${RISKBEX_RELEASE:?Set an immutable release tag}
+    ports: !reset []
+    logging: *logging
+    mem_limit: 1g
+    cpus: 0.75
+    pids_limit: 128
+    environment:
+      STREAMLIT_SERVER_ENABLE_CORS: "true"
+      STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION: "true"
+      STREAMLIT_SERVER_FILE_WATCHER_TYPE: none
+      STREAMLIT_SERVER_MAX_UPLOAD_SIZE: "10"
+      STREAMLIT_CLIENT_SHOW_ERROR_DETAILS: "none"
+
+  updater:
+    image: riskbex-api:${RISKBEX_RELEASE:?Set an immutable release tag}
+    logging: *logging
+    mem_limit: 1536m
+    cpus: 1.0
+    pids_limit: 128
+    volumes:
+      - type: bind
+        source: ${RISKBEX_STORE:?Set an absolute production store path}
+        target: /app/runtime/main
+        read_only: false
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${RISKBEX_SEED:?Set validated seed path}
+        target: /inputs/seed.csv
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${RISKBEX_REGRESSION_RECEIPT:?Set validated receipt path}
+        target: /inputs/receipt.json
+        read_only: true
+        bind:
+          create_host_path: false
+    environment:
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+
+  caddy:
+    image: caddy:2.10.2-alpine
+    profiles: [public]
+    user: "${RISKBEX_UID:?Set UID}:${RISKBEX_GID:?Set GID}"
+    read_only: true
+    tmpfs: [/tmp:rw,nosuid,nodev,size=32m]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    init: true
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 128m
+    cpus: 0.25
+    pids_limit: 64
+    environment:
+      RISKBEX_DOMAIN: ${RISKBEX_DOMAIN:?Set domain; example.invalid is a preparation placeholder}
+      XDG_DATA_HOME: /data
+      XDG_CONFIG_HOME: /config
+    ports:
+      - "80:8080"
+      - "443:8443"
+    volumes:
+      - type: bind
+        source: ./deploy/production/Caddyfile
+        target: /etc/caddy/Caddyfile
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${RISKBEX_TLS_DATA:?Set TLS storage path}
+        target: /data
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${RISKBEX_TLS_CONFIG:?Set TLS config path}
+        target: /config
+        bind:
+          create_host_path: false
+    depends_on:
+      dashboard:
+        condition: service_healthy
