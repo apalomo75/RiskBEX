@@ -4,6 +4,7 @@ import math
 import altair as alt
 import pandas as pd
 import requests
+from src.riskbex.dashboard_transport import get as publication_get
 from src.riskbex.i18n import ui as st
 
 STRATEGIES = {'Buy & Hold': 'benchmark', 'Regime-Based': 'regime_based',
@@ -204,7 +205,7 @@ def render_investment_simulator(api_url, load_sessions, technical_publications):
                                   strategy=STRATEGIES[strategy], basis=BASES[basis])
                 try:
                     with st.spinner('Running historical simulation…'):
-                        response = requests.get(f'{api_url}/investment-simulation', params=parameters, timeout=30)
+                        response = publication_get(f'{api_url}/investment-simulation', params=parameters, timeout=30)
                         response.raise_for_status()
                         result = validate_response(response.json(), parameters)
                     st.session_state['investment_simulation_result'] = result

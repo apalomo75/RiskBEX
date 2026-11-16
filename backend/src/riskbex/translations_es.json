@@ -644,5 +644,10 @@
   "Published closing prices and same-session filtered MAIN regimes. Up to 252 trading sessions; colours describe risk, not certain future price moves.": "Precios de cierre publicados y regímenes filtrados MAIN de la misma sesión. Hasta 252 sesiones bursátiles; los colores describen el riesgo, no movimientos futuros seguros.",
   "Current Market Regime · Filtered": "Régimen actual del mercado · Filtrado",
   "Regime-Based Target Exposure": "Exposición objetivo de la estrategia por régimen",
-  "Filtered regime at the published close. Exposure targets the next session; it is not an ML forecast or a personalised recommendation.": "Régimen filtrado al cierre publicado. La exposición se refiere a la próxima sesión; no es una previsión ML ni una recomendación personalizada."
+  "Filtered regime at the published close. Exposure targets the next session; it is not an ML forecast or a personalised recommendation.": "Régimen filtrado al cierre publicado. La exposición se refiere a la próxima sesión; no es una previsión ML ni una recomendación personalizada.",
+  "Scheduler status: Not enabled for this read-only application": "Estado del programador: No habilitado para esta aplicación de solo lectura",
+  "No usable validated MAIN publication is available.": "No hay ninguna publicación MAIN validada disponible.",
+  "The data service could not return operational results.": "El servicio de datos no pudo devolver resultados operativos.",
+  "Validated Read-Only Publication": "Publicación validada de solo lectura",
+  "RISKBEX presents a validated, read-only publication of IBEX 35 risk models and adaptive investment strategies. This application does not update market data automatically.": "RISKBEX presenta una publicación validada de solo lectura de modelos de riesgo del IBEX 35 y estrategias de inversión adaptativas. Esta aplicación no actualiza automáticamente los datos de mercado."
 }

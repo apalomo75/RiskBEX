@@ -1,6 +1,7 @@
 import altair as alt
 from src.riskbex.i18n import ui as st
 import requests
+from src.riskbex.dashboard_transport import get as publication_get
 import pandas as pd
 import os
 from datetime import date
@@ -15,7 +16,7 @@ from src.riskbex.performance_story import comparison_stories, participation_stor
 API_URL = os.getenv("RISKBEX_API_URL", "http://127.0.0.1:8000").rstrip("/")
 plt.rcParams.update({"font.size": 12, "axes.labelsize": 12, "xtick.labelsize": 11, "ytick.labelsize": 11})
 BASE_DIR = Path(__file__).resolve().parent
-FIGURES_DIR = BASE_DIR / "figures" / "chapter2"
+FIGURES_DIR = Path(os.getenv("RISKBEX_FIGURES_DIR", BASE_DIR / "figures")) / "chapter2"
 
 st.set_page_config(
     page_title="RISKBEX",
@@ -605,7 +606,9 @@ def render_update_diagnostics(data):
     root = Path(os.getenv("RISKBEX_OPERATIONAL_DIR", BASE_DIR / "runtime/main"))
     update = publication.get("update_status")
     update = update if isinstance(update, dict) else read_update_status(root)
-    if local_scheduler_active(root):
+    if os.getenv("RISKBEX_PRESENTATION_MODE") == "snapshot":
+        st.caption("Scheduler status: Not enabled for this read-only application")
+    elif local_scheduler_active(root):
         st.caption("Scheduler status: Active")
     else:
         st.caption("Scheduler status: Not verified")
@@ -630,13 +633,18 @@ def show_landing():
     st.markdown("**Developed by Alejandro Palomo Morales**")
     st.header("What if Machine Learning could help investors adapt to changing market risk?")
     st.subheader("Pursue market returns. Manage downside risk.")
-    st.write("RISKBEX combines quantitative risk models, machine learning and an automated market-data pipeline to monitor the IBEX 35 and evaluate adaptive investment strategies designed to manage downside risk.")
+    snapshot_mode = os.getenv("RISKBEX_PRESENTATION_MODE") == "snapshot"
+    if snapshot_mode:
+        st.write("RISKBEX presents a validated, read-only publication of IBEX 35 risk models and adaptive investment strategies. This application does not update market data automatically.")
+    else:
+        st.write("RISKBEX combines quantitative risk models, machine learning and an automated market-data pipeline to monitor the IBEX 35 and evaluate adaptive investment strategies designed to manage downside risk.")
     render_price_regimes(welcome_history(df, data), landing=True)
     render_welcome_publication(data)
 
+    pipeline_highlight = "Validated Read-Only Publication" if snapshot_mode else "Automated Daily Pipeline"
     st.markdown(
         '<div class="welcome-highlights" aria-label="RISKBEX features">'
-        '<span>Automated Daily Pipeline</span>'
+        f'<span>{pipeline_highlight}</span>'
         '<span>Markov + Machine Learning</span>'
         '<span>IBEX 35 Market Data</span></div>',
         unsafe_allow_html=True,
@@ -812,7 +820,7 @@ def render_status_box(regime_label: str, risk_score: float):
 
 @st.cache_data(ttl=30)
 def load_latest_data():
-    response = requests.get(f"{API_URL}/latest-risk", timeout=10)
+    response = publication_get(f"{API_URL}/latest-risk", timeout=10)
     response.raise_for_status()
     data = response.json()
     if not isinstance(data, dict) or not data.get("publication") or not data.get("signal"):
@@ -926,7 +934,7 @@ def render_operational_overview(data):
 
 @st.cache_data(ttl=30)
 def load_historical_data():
-    response = requests.get(f"{API_URL}/historical-risk?limit=all", timeout=10)
+    response = publication_get(f"{API_URL}/historical-risk?limit=all", timeout=10)
     response.raise_for_status()
     hist_data = response.json()
     df = pd.DataFrame(hist_data)
@@ -937,7 +945,7 @@ def load_historical_data():
 
 @st.cache_data(ttl=30)
 def fetch_regime_endpoint(path: str):
-    response = requests.get(f"{API_URL}{path}", timeout=10)
+    response = publication_get(f"{API_URL}{path}", timeout=10)
     response.raise_for_status()
     return response.json()
 
@@ -953,7 +961,7 @@ def fetch_regime_endpoint_safe(path: str, fallback, label: str):
 
 @st.cache_data(ttl=30)
 def fetch_backtesting_endpoint(path: str):
-    response = requests.get(f"{API_URL}{path}", timeout=10)
+    response = publication_get(f"{API_URL}{path}", timeout=10)
     response.raise_for_status()
     return response.json()
 
@@ -971,7 +979,7 @@ def fetch_backtesting_endpoint_safe(path: str, fallback, label: str):
 
 @st.cache_data(ttl=30)
 def fetch_tail_endpoint(path: str):
-    response = requests.get(f"{API_URL}{path}", timeout=10)
+    response = publication_get(f"{API_URL}{path}", timeout=10)
     response.raise_for_status()
     return response.json()
 
@@ -1749,7 +1757,7 @@ def render_tail_latest(latest_payload):
 
 @st.cache_data(ttl=30)
 def load_decision_history():
-    response = requests.get(f'{API_URL}/decision-explorer', timeout=10)
+    response = publication_get(f'{API_URL}/decision-explorer', timeout=10)
     response.raise_for_status()
     payload = response.json()
     if not isinstance(payload, dict) or not payload.get('sessions') or not payload.get('mapping') or not payload.get('publication'):
@@ -2027,9 +2035,9 @@ try:
     data = load_latest_data()
 except requests.HTTPError as exc:
     if exc.response is not None and exc.response.status_code == 503:
-        st.warning("No usable operational MAIN publication is available from FastAPI.")
+        st.warning("No usable validated MAIN publication is available.")
     else:
-        st.warning("FastAPI could not return operational results.")
+        st.warning("The data service could not return operational results.")
 except (requests.RequestException, ValueError):
     st.warning("Market data is unavailable or could not be verified. Other views remain available.")
 

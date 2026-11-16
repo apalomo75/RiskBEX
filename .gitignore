@@ -32,3 +32,11 @@ backend/figures/
 
 # Versioned live results (models and frozen fixtures stay tracked)
 backend/runtime/
+
+# Snapshot exports require explicit review before any data publication.
+cloud/publication/
+cloud/*.zip
+backend/.streamlit/secrets.toml
+
+# Reviewed release candidates remain local until explicit publication approval.
+cloud/release-candidates/

@@ -1,5 +1,7 @@
 """Read-only historical decision explanations tied to a verified MAIN snapshot."""
 import json
+import os
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -15,7 +17,7 @@ TARGETS = ['regime_based', 'ml_hard', 'ml_proba']
 def decision_snapshot(data):
     try:
         manifest = data['manifest']
-        package_root = BACKEND / 'model_packages/main-v1'
+        package_root = Path(os.getenv('RISKBEX_PRESENTATION_PACKAGE_DIR', BACKEND / 'model_packages/main-v1'))
         package_path = package_root / 'manifest.json'
         if digest(package_path) != manifest['model_manifest_sha256']:
             raise ValueError('The available model package differs from the publication.')

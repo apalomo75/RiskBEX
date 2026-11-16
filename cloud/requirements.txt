@@ -1,0 +1,12 @@
+# Python 3.13; direct dependencies pinned to the offline-tested UI runtime.
+streamlit==1.56.0
+altair==6.1.0
+pandas==2.3.3
+numpy==2.3.4
+matplotlib==3.10.6
+requests==2.32.4
+fastapi==0.136.1
+pydantic==2.11.7
+httpx==0.28.1
+starlette==1.0.0
+pyarrow==23.0.1

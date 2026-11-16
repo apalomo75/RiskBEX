@@ -1,0 +1,19 @@
+split,from_regime,from_label,from_risk_order,to_regime,to_label,to_risk_order,transition_probability
+MAIN,0,Low Risk,1,0,Low Risk,1,0.9805777223880404
+MAIN,0,Low Risk,1,1,High Risk,3,2.0483771322141073e-13
+MAIN,0,Low Risk,1,2,Medium Risk,2,0.019422277611754746
+MAIN,1,High Risk,3,0,Low Risk,1,1.2079996087098716e-10
+MAIN,1,High Risk,3,1,High Risk,3,0.9661846040146467
+MAIN,1,High Risk,3,2,Medium Risk,2,0.0338153958645534
+MAIN,2,Medium Risk,2,0,Low Risk,1,0.01674255494034271
+MAIN,2,Medium Risk,2,1,High Risk,3,0.00993258248432999
+MAIN,2,Medium Risk,2,2,Medium Risk,2,0.9733248625753272
+ROBUST,0,Low Risk,1,0,Low Risk,1,0.9801243032817895
+ROBUST,0,Low Risk,1,1,Medium Risk,2,0.019875696702105428
+ROBUST,0,Low Risk,1,2,High Risk,3,1.6105117239817446e-11
+ROBUST,1,Medium Risk,2,0,Low Risk,1,0.01814212381635483
+ROBUST,1,Medium Risk,2,1,Medium Risk,2,0.9727105983123369
+ROBUST,1,Medium Risk,2,2,High Risk,3,0.009147277871308312
+ROBUST,2,High Risk,3,0,Low Risk,1,5.348307858514695e-23
+ROBUST,2,High Risk,3,1,Medium Risk,2,0.0309473634080664
+ROBUST,2,High Risk,3,2,High Risk,3,0.9690526365919336
