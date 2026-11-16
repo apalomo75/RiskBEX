@@ -3,6 +3,7 @@
 Run in a clean environment from repository root with PYTHONPATH=backend.
 No operational writes, providers or model packages are invoked.
 """
+from datetime import date
 from contextlib import contextmanager
 import json
 import os
@@ -187,6 +188,14 @@ class RealCloudCandidate(unittest.TestCase):
                 result = app.session_state['investment_simulation_result']
                 self.assertEqual(result['publication']['version'], json.loads((CANDIDATE / 'snapshot.json').read_text())['version'])
                 self.assertGreater(len(result['series']), 1)
+                app.date_input(key='sim_start').set_value(date.fromisoformat(dates[1]['date'])).run()
+                self.assertEqual(app.session_state['investment_simulation_result'], result)
+                app.button(key='sim_submit').click().run()
+                self.healthy(app)
+                params = dict(initial_capital=10000., start_date=dates[1]['date'],
+                              end_date=dates[-1]['date'], strategy='regime_based', basis='net')
+                self.assertEqual(app.session_state['investment_simulation_result'],
+                                 self.get('/investment-simulation', params))
 
     def test_05_research_endpoints_and_every_original_image(self):
         with offline():

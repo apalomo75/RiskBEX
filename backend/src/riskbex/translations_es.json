@@ -649,5 +649,13 @@
   "No usable validated MAIN publication is available.": "No hay ninguna publicación MAIN validada disponible.",
   "The data service could not return operational results.": "El servicio de datos no pudo devolver resultados operativos.",
   "Validated Read-Only Publication": "Publicación validada de solo lectura",
-  "RISKBEX presents a validated, read-only publication of IBEX 35 risk models and adaptive investment strategies. This application does not update market data automatically.": "RISKBEX presenta una publicación validada de solo lectura de modelos de riesgo del IBEX 35 y estrategias de inversión adaptativas. Esta aplicación no actualiza automáticamente los datos de mercado."
+  "RISKBEX presents a validated, read-only publication of IBEX 35 risk models and adaptive investment strategies. This application does not update market data automatically.": "RISKBEX presenta una publicación validada de solo lectura de modelos de riesgo del IBEX 35 y estrategias de inversión adaptativas. Esta aplicación no actualiza automáticamente los datos de mercado.",
+  "Choose a published trading session. Unavailable start dates are proposed forward to the next session; end dates backward to the previous session. Adjustments require your confirmation and a new submission.": "Elija una sesión publicada. Para un inicio no disponible se propone la siguiente sesión; para el fin, la anterior. Los ajustes requieren su confirmación y un nuevo envío.",
+  "The start session return is excluded; returns through the end session are included. Select at least one subsequent trading session.": "Se excluye el rendimiento de la sesión inicial y se incluyen los rendimientos hasta la sesión final. Seleccione al menos una sesión posterior.",
+  "Start date must precede end date and include at least one subsequent published trading session.": "La fecha inicial debe ser anterior a la final e incluir al menos una sesión publicada posterior.",
+  "Selected dates include an unavailable session (weekend, market holiday or missing published session). Proposed start: {0}; proposed end: {1}. No simulation was run. Apply these dates, review them and submit again.": "Las fechas elegidas incluyen una sesión no disponible (fin de semana, festivo bursátil o sesión no publicada). Inicio propuesto: {0}; fin propuesto: {1}. No se ha ejecutado la simulación. Aplique estas fechas, revíselas y envíe de nuevo.",
+  "Apply Proposed Trading Sessions": "Aplicar sesiones propuestas",
+  "The proposed window has no subsequent trading session. Choose a wider date range.": "El intervalo propuesto no contiene una sesión posterior. Elija un intervalo más amplio.",
+  "Choose both a start date and an end date.": "Elija una fecha de inicio y una fecha de fin.",
+  "Selected dates must be within the available published history.": "Las fechas elegidas deben estar dentro del historial publicado disponible."
 }

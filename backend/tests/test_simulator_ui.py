@@ -4,6 +4,7 @@ import copy
 import json
 from pathlib import Path
 import unittest
+from datetime import date
 from unittest.mock import Mock, patch
 
 import requests
@@ -64,7 +65,8 @@ class SimulatorUITests(unittest.TestCase):
         app = self.run_app()
         self.assertEqual(self.calls, [])
         self.assertEqual(app.number_input(key='sim_capital').value, 10000.)
-        self.assertEqual(app.selectbox(key='sim_start').options, [r['date'] for r in self.sessions['sessions']])
+        self.assertEqual(app.date_input(key='sim_start').value, date(2026, 10, 30))
+        self.assertEqual(app.date_input(key='sim_end').value, date(2026, 11, 4))
         app.button(key='sim_submit').click()
         app = self.run_app(app)
         self.assertEqual(self.calls, [dict(initial_capital=10000., start_date='2026-10-30', end_date='2026-11-04', strategy='regime_based', basis='net')])
@@ -83,6 +85,88 @@ class SimulatorUITests(unittest.TestCase):
         self.run_app(app)
         self.assertEqual(len(self.calls), 1)
         self.assertEqual(app.metric[0].value, '€10,000.00')
+
+    def test_unavailable_dates_require_explicit_adjustment_and_resubmission(self):
+        for selected, expected in [(date(2026, 10, 31), date(2026, 11, 2)),
+                                   (date(2026, 11, 1), date(2026, 11, 2))]:
+            with self.subTest(selected=selected):
+                app = self.run_app()
+                app.date_input(key='sim_start').set_value(selected)
+                app.button(key='sim_submit').click()
+                self.run_app(app)
+                self.assertFalse(self.calls)
+                self.assertTrue(any('Proposed start: 2026-11-02' in w.value for w in app.warning))
+                self.assertEqual(app.date_input(key='sim_start').value, selected)
+                app.button(key='sim_apply_dates').click()
+                self.run_app(app)
+                self.assertEqual(app.date_input(key='sim_start').value, expected)
+                self.assertFalse(self.calls)
+        # An unpublished weekday follows the same rule as a market holiday.
+        self.sessions['sessions'].pop(2)
+        st.cache_data.clear()
+        app = self.run_app()
+        app.date_input(key='sim_end').set_value(date(2026, 11, 3))
+        app.button(key='sim_submit').click()
+        self.run_app(app)
+        self.assertFalse(self.calls)
+        self.assertTrue(any('proposed end: 2026-11-02' in w.value for w in app.warning))
+        app.button(key='sim_apply_dates').click()
+        self.run_app(app)
+        self.assertEqual(app.date_input(key='sim_end').value, date(2026, 11, 2))
+
+    def test_date_edits_preserve_submitted_result_labels(self):
+        app = self.run_app()
+        app.button(key='sim_submit').click()
+        self.run_app(app)
+        saved = copy.deepcopy(app.session_state['investment_simulation_result'])
+        app.date_input(key='sim_start').set_value(date(2026, 11, 2))
+        app.date_input(key='sim_end').set_value(date(2026, 11, 3))
+        self.run_app(app)
+        self.assertEqual(len(self.calls), 1)
+        self.assertEqual(app.session_state['investment_simulation_result'], saved)
+        self.assertTrue(any('2026-10-30 to 2026-11-04' in c.value for c in app.caption))
+
+    def test_single_session_and_collapsed_adjustment_rejected(self):
+        app = self.run_app()
+        app.date_input(key='sim_start').set_value(date(2026, 10, 31))
+        app.date_input(key='sim_end').set_value(date(2026, 11, 1))
+        app.button(key='sim_submit').click()
+        self.run_app(app)
+        self.assertFalse(self.calls)
+        self.assertTrue(any('wider date range' in e.value for e in app.error))
+        self.sessions['sessions'] = self.sessions['sessions'][-1:]
+        st.cache_data.clear()
+        app = self.run_app()
+        self.assertEqual(app.date_input(key='sim_start').value, date(2026, 11, 4))
+        app.button(key='sim_submit').click()
+        self.run_app(app)
+        self.assertFalse(self.calls)
+        self.assertTrue(any('must precede' in e.value for e in app.error))
+
+    def test_spanish_calendar_labels_help_and_adjustment(self):
+        app = self.run_app()
+        app.session_state['ui_language'] = 'es'
+        self.run_app(app)
+        self.assertEqual(app.date_input(key='sim_start').label, 'Fecha inicial')
+        self.assertEqual(app.date_input(key='sim_end').label, 'Fecha final')
+        self.assertIn('Elija una sesión publicada', app.date_input(key='sim_start').proto.help)
+        app.date_input(key='sim_start').set_value(date(2026, 10, 31))
+        app.button(key='sim_submit').click()
+        self.run_app(app)
+        self.assertFalse(self.calls)
+        self.assertTrue(any('Inicio propuesto: 2026-11-02' in w.value for w in app.warning))
+        self.assertEqual(app.button(key='sim_apply_dates').label, 'Aplicar sesiones propuestas')
+
+    def test_calendar_bounds_and_cleared_date(self):
+        app = self.run_app()
+        for key in ['sim_start', 'sim_end']:
+            self.assertEqual(app.date_input(key=key).proto.min, '2026-10-30')
+            self.assertEqual(app.date_input(key=key).proto.max, '2026-11-04')
+        app.date_input(key='sim_start').set_value(None)
+        app.button(key='sim_submit').click()
+        self.run_app(app)
+        self.assertFalse(self.calls)
+        self.assertTrue(any('Choose both' in e.value for e in app.error))
 
     def test_gross_and_all_strategy_mappings(self):
         app = self.run_app()
@@ -106,12 +190,12 @@ class SimulatorUITests(unittest.TestCase):
         self.assertEqual(self.calls, [])
         self.assertTrue(any('strictly positive' in x.value for x in app.error))
         app.number_input(key='sim_capital').set_value(10000.)
-        app.selectbox(key='sim_start').select('2026-11-04')
-        app.selectbox(key='sim_end').select('2026-10-30')
+        app.date_input(key='sim_start').set_value(date.fromisoformat('2026-11-04'))
+        app.date_input(key='sim_end').set_value(date.fromisoformat('2026-10-30'))
         app.button(key='sim_submit').click()
         self.run_app(app)
         self.assertEqual(self.calls, [])
-        self.assertTrue(any('on or before' in x.value for x in app.error))
+        self.assertTrue(any('must precede' in x.value for x in app.error))
 
     def test_errors_clear_previous_results(self):
         app = self.run_app()
@@ -166,18 +250,18 @@ class SimulatorUITests(unittest.TestCase):
         app = self.run_app()
         self.answer = replay(fixture([.02, .03, .01], [.5, .5, .5]), initial_capital=10000.,
                              start_date='2026-11-02', end_date='2026-11-03', basis='net')
-        app.selectbox(key='sim_start').select('2026-11-02')
-        app.selectbox(key='sim_end').select('2026-11-03')
+        app.date_input(key='sim_start').set_value(date.fromisoformat('2026-11-02'))
+        app.date_input(key='sim_end').set_value(date.fromisoformat('2026-11-03'))
         app.button(key='sim_submit').click()
         self.run_app(app)
         self.assertTrue(any('Both tail means are non-negative' in w.value for w in app.markdown))
         self.assertEqual(app.dataframe[0].value.iloc[0]['Selected Strategy'], 'Unavailable')
         self.answer = replay(initial_capital=10000., start_date='2026-11-03', end_date='2026-11-03', basis='net')
-        app.selectbox(key='sim_start').select('2026-11-03')
+        app.date_input(key='sim_start').set_value(date.fromisoformat('2026-11-03'))
         app.button(key='sim_submit').click()
         self.run_app(app)
-        self.assertEqual(app.metric[1].value, '€10,000.00')
-        self.assertTrue(any('Applied exposure is unavailable' in w.value for w in app.info))
+        self.assertFalse(app.metric)
+        self.assertTrue(any('must precede' in w.value for w in app.error))
 
     def test_chart_values_are_exact_api_series(self):
         for fields in [dict(portfolio_value_eur='Selected Strategy', buy_hold_value_eur='Buy & Hold'),

@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import re
 import unittest
+from datetime import date
 from unittest.mock import Mock, patch
 
 import pandas as pd
@@ -55,7 +56,7 @@ class CatalogTests(unittest.TestCase):
         # catches new English notices instead of silently accepting EN fallback.
         methods = {'title', 'header', 'subheader', 'markdown', 'caption', 'info', 'warning',
                    'error', 'success', 'expander', 'spinner', 'button', 'form_submit_button',
-                   'number_input', 'radio', 'selectbox', 'multiselect', 'segmented_control'}
+                   'number_input', 'date_input', 'radio', 'selectbox', 'multiselect', 'segmented_control'}
         protected = {'RISKBEX', 'ℹ', 'shift(1)', 'ret_1d'}
         missing = []
         for filename in ('dashboard.py', 'src/riskbex/simulator_ui.py'):
@@ -340,8 +341,8 @@ class SimulatorLanguageTests(unittest.TestCase):
         numbers = [m.value for m in app.metric]
         app.number_input(key='sim_capital').set_value(15000.)
         app.selectbox(key='sim_strategy').set_value('ML Hard')
-        app.selectbox(key='sim_start').set_value('2026-11-02')
-        app.selectbox(key='sim_end').set_value('2026-11-03')
+        app.date_input(key='sim_start').set_value(date.fromisoformat('2026-11-02'))
+        app.date_input(key='sim_end').set_value(date.fromisoformat('2026-11-03'))
         app.radio(key='sim_basis').set_value('Gross')
         run()
         for lang in ['es', 'en', 'es']:
@@ -352,8 +353,8 @@ class SimulatorLanguageTests(unittest.TestCase):
             self.assertEqual(app.number_input(key='sim_capital').value, 15000.)
             self.assertEqual(app.selectbox(key='sim_strategy').value, 'ML Hard')
             self.assertEqual(app.radio(key='sim_basis').value, 'Gross')
-            self.assertEqual(app.selectbox(key='sim_start').value, '2026-11-02')
-            self.assertEqual(app.selectbox(key='sim_end').value, '2026-11-03')
+            self.assertEqual(app.date_input(key='sim_start').value, date.fromisoformat('2026-11-02'))
+            self.assertEqual(app.date_input(key='sim_end').value, date.fromisoformat('2026-11-03'))
             self.assertEqual(len(helper.calls), 1)
         body = visible(app)
         for phrase in ('The selected strategy', 'Buy & Hold has', 'log-return points', 'not current market', 'Historical daily'):
@@ -362,6 +363,8 @@ class SimulatorLanguageTests(unittest.TestCase):
         run()
         app.button(key='welcome_Investment Simulator').click()
         run()
+        self.assertEqual(app.date_input(key='sim_start').value, date(2026, 11, 2))
+        self.assertEqual(app.date_input(key='sim_end').value, date(2026, 11, 3))
         self.assertEqual(app.number_input(key='sim_capital').value, 15000.)
         self.assertEqual(app.session_state['investment_simulation_result'], original)
         self.assertEqual(len(helper.calls), 1)

@@ -151,7 +151,7 @@ class Presentation:
     """Small explicit adapter around native Streamlit rendering boundaries."""
     TEXT = {'title', 'header', 'subheader', 'markdown', 'caption', 'text', 'info',
             'warning', 'error', 'success', 'spinner', 'expander', 'popover',
-            'button', 'form_submit_button', 'number_input', 'metric'}
+            'button', 'form_submit_button', 'number_input', 'date_input', 'metric'}
     CHOICES = {'radio', 'selectbox', 'multiselect', 'segmented_control'}
     FRAMES = {'dataframe', 'table', 'line_chart', 'area_chart', 'bar_chart'}
 

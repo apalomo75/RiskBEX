@@ -1,5 +1,7 @@
 """Streamlit API presentation only; capital paths and risk metrics stay in the API."""
 import math
+from datetime import date
+from bisect import bisect_left, bisect_right
 
 import altair as alt
 import pandas as pd
@@ -174,6 +176,7 @@ def render_investment_simulator(api_url, load_sessions, technical_publications):
     try:
         payload = load_sessions()
         dates = [row['date'] for row in payload['sessions']]
+        calendar = [date.fromisoformat(d) for d in dates]
         if not dates or dates != sorted(set(dates)):
             raise ValueError('No valid published trading sessions.')
     except (requests.RequestException, ValueError, KeyError, TypeError):
@@ -189,8 +192,12 @@ def render_investment_simulator(api_url, load_sessions, technical_publications):
                                        value=10_000., step=100., key='sim_capital')
             strategy = col2.selectbox('Investment Strategy', list(STRATEGIES), index=1, key='sim_strategy')
             col1, col2 = st.columns(2)
-            start = col1.selectbox('Starting Trading Session', dates, index=0, key='sim_start')
-            end = col2.selectbox('Ending Trading Session', dates, index=len(dates) - 1, key='sim_end')
+            start = col1.date_input('Start Date', value=calendar[0], min_value=calendar[0],
+                                    max_value=calendar[-1], key='sim_start', format='YYYY-MM-DD',
+                                    help='Choose a published trading session. Unavailable start dates are proposed forward to the next session; end dates backward to the previous session. Adjustments require your confirmation and a new submission.')
+            end = col2.date_input('End Date', value=calendar[-1], min_value=calendar[0],
+                                  max_value=calendar[-1], key='sim_end', format='YYYY-MM-DD',
+                                  help='The start session return is excluded; returns through the end session are included. Select at least one subsequent trading session.')
             basis = st.radio('Simulation Performance Basis', list(BASES), index=1, horizontal=True, key='sim_basis')
             submitted = st.form_submit_button('Run Historical Simulation', key='sim_submit')
         if submitted:
@@ -198,10 +205,25 @@ def render_investment_simulator(api_url, load_sessions, technical_publications):
             st.session_state.pop('investment_simulation_result', None)
             if not math.isfinite(capital) or capital <= 0:
                 st.error('Initial investment must be strictly positive and finite.')
-            elif start > end:
-                st.error('Starting session must be on or before the ending session.')
+            elif start is None or end is None:
+                st.error('Choose both a start date and an end date.')
+            elif not (calendar[0] <= start <= calendar[-1] and calendar[0] <= end <= calendar[-1]):
+                st.error('Selected dates must be within the available published history.')
+            elif start >= end:
+                st.error('Start date must precede end date and include at least one subsequent published trading session.')
+            elif start not in calendar or end not in calendar:
+                proposed_start = calendar[bisect_left(calendar, start)]
+                proposed_end = calendar[bisect_right(calendar, end) - 1]
+                st.warning(f'Selected dates include an unavailable session (weekend, market holiday or missing published session). Proposed start: {proposed_start}; proposed end: {proposed_end}. No simulation was run. Apply these dates, review them and submit again.')
+                if proposed_start < proposed_end:
+                    def apply_dates():
+                        st.session_state['sim_start'] = proposed_start
+                        st.session_state['sim_end'] = proposed_end
+                    st.button('Apply Proposed Trading Sessions', key='sim_apply_dates', on_click=apply_dates)
+                else:
+                    st.error('The proposed window has no subsequent trading session. Choose a wider date range.')
             else:
-                parameters = dict(initial_capital=capital, start_date=start, end_date=end,
+                parameters = dict(initial_capital=capital, start_date=start.isoformat(), end_date=end.isoformat(),
                                   strategy=STRATEGIES[strategy], basis=BASES[basis])
                 try:
                     with st.spinner('Running historical simulation…'):
