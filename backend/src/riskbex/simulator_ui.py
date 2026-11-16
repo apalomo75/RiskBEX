@@ -4,7 +4,7 @@ import math
 import altair as alt
 import pandas as pd
 import requests
-import streamlit as st
+from src.riskbex.i18n import ui as st
 
 STRATEGIES = {'Buy & Hold': 'benchmark', 'Regime-Based': 'regime_based',
               'ML Hard': 'ml_hard', 'ML Probability-Weighted': 'ml_proba'}
@@ -130,18 +130,21 @@ def render_result(result):
     st.subheader('Portfolio Value')
     st.altair_chart(series_chart(result['series'], {'portfolio_value_eur': 'Selected Strategy', 'buy_hold_value_eur': 'Buy & Hold'}, 'Portfolio Value (EUR)'), use_container_width=True)
     st.caption('Both series start at the same initial capital. Hover for values; scroll to zoom and drag to pan.')
-    st.subheader('Drawdown')
-    if all(row.get('portfolio_drawdown') is not None and row.get('buy_hold_drawdown') is not None for row in result['series']):
-        st.altair_chart(series_chart(result['series'], {'portfolio_drawdown': 'Selected Strategy', 'buy_hold_drawdown': 'Buy & Hold'}, 'Drawdown', True), use_container_width=True)
-    else:
-        st.info('Drawdown series is unavailable from this API version.')
-    st.subheader('Historical Exposure')
-    exposures = [row for row in result['series'] if row.get('applied_exposure') is not None and row.get('cash_exposure') is not None]
-    if exposures:
-        st.altair_chart(series_chart(exposures, {'applied_exposure': 'Equity Exposure', 'cash_exposure': 'Uninvested Cash'}, 'Allocation', True), use_container_width=True)
-    else:
-        st.info('Applied exposure is unavailable for this sample.')
-    st.caption('Applied equity exposure belongs to each return session. The remainder is hypothetical uninvested cash earning zero. The capital anchor has no realised exposure observation. These are historical model allocations, not executed trades.')
+    downside, allocation = st.columns(2, gap="large")
+    with downside:
+        st.subheader('Drawdown')
+        if all(row.get('portfolio_drawdown') is not None and row.get('buy_hold_drawdown') is not None for row in result['series']):
+            st.altair_chart(series_chart(result['series'], {'portfolio_drawdown': 'Selected Strategy', 'buy_hold_drawdown': 'Buy & Hold'}, 'Drawdown', True), use_container_width=True)
+        else:
+            st.info('Drawdown series is unavailable from this API version.')
+    with allocation:
+        st.subheader('Historical Exposure')
+        exposures = [row for row in result['series'] if row.get('applied_exposure') is not None and row.get('cash_exposure') is not None]
+        if exposures:
+            st.altair_chart(series_chart(exposures, {'applied_exposure': 'Equity Exposure', 'cash_exposure': 'Uninvested Cash'}, 'Allocation', True), use_container_width=True)
+        else:
+            st.info('Applied exposure is unavailable for this sample.')
+        st.caption('Applied equity exposure belongs to each return session. The remainder is hypothetical uninvested cash earning zero. The capital anchor has no realised exposure observation. These are historical model allocations, not executed trades.')
     st.subheader('Risk and Trading Costs')
     rows = []
     for label, key in [('Annualized Volatility', 'annualized_volatility'), ('Daily Expected Shortfall / CVaR (95%)', 'daily_cvar_95'), ('Maximum Drawdown', 'maximum_drawdown')]:

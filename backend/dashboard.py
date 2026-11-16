@@ -1,11 +1,15 @@
 import altair as alt
-import streamlit as st
+from src.riskbex.i18n import ui as st
 import requests
 import pandas as pd
 import os
+from datetime import date
 import matplotlib.pyplot as plt
 from pathlib import Path
+from src.riskbex.i18n import render_language_selector
+from src.riskbex.presentation_status import read_update_status, local_scheduler_active
 from src.riskbex.simulator_ui import render_investment_simulator
+from src.riskbex.welcome import welcome_history, welcome_assessment
 from src.riskbex.performance_story import comparison_stories, participation_stories
 
 API_URL = os.getenv("RISKBEX_API_URL", "http://127.0.0.1:8000").rstrip("/")
@@ -18,6 +22,8 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+
+render_language_selector()
 
 st.markdown(
     """
@@ -61,12 +67,28 @@ st.markdown(
 
     [data-testid="stHeader"] {
         background: rgba(0, 0, 0, 0);
+        pointer-events: none;
+    }
+
+    /* The transparent toolbar spans the language selector. Only its actual
+       controls should intercept clicks, not its otherwise empty overlay. */
+    [data-testid="stHeader"] [data-testid="stToolbar"] {
+        pointer-events: none;
+    }
+
+    [data-testid="stHeader"] :is(button, a, input, [role="button"]) {
+        pointer-events: auto;
     }
 
     .block-container {
-        max-width: 1320px;
+        max-width: 1680px;
+        padding-inline: clamp(1rem, 3vw, 3rem);
         padding-top: 1.4rem;
         padding-bottom: 2rem;
+    }
+
+    @media (max-width: 640px) {
+        .block-container { padding-inline: 1rem; }
     }
 
     h1, h2, h3, h4, h5, h6, p, label, div, span {
@@ -548,24 +570,70 @@ def render_strategy_explanations():
         st.write("Probability weighting is not assumed to outperform. Historical returns, downside risk and costs determine whether it adds value.")
 
 
+def publication_freshness(publication):
+    if not publication.get("data_date"):
+        return "Unavailable"
+    if publication.get("freshness") == "current" and publication.get("is_current") is True:
+        return "Current"
+    if publication.get("freshness") in {"stale", "historical", "simulated"} or publication.get("is_current") is False:
+        return "Stale"
+    return "Unavailable"
+
+
 def render_welcome_publication(data):
-    publication = data.get("publication") if isinstance(data, dict) else None
-    if not isinstance(publication, dict) or not publication.get("data_date"):
-        st.caption("Market data status unavailable · Automatic update status unavailable")
-        return
-    freshness = publication.get("freshness")
-    if freshness == "current" and publication.get("is_current") is True:
-        status = "Current publication"
-    elif freshness in {"stale", "historical", "simulated"} or publication.get("is_current") is False:
-        status = "Stale / non-current publication"
+    publication = (data or {}).get("publication") or {}
+    try:
+        session = date.fromisoformat(publication.get("data_date", ""))
+        # Numeric day/month/year is readable in both supported languages.
+        session_label = session.strftime("%d / %m / %Y")
+    except (ValueError, TypeError):
+        session_label = "Unavailable"
+        publication = {}
+    regime, exposure = welcome_assessment(data)
+    current, target, published = st.columns(3)
+    current.metric("Current Market Regime · Filtered", regime)
+    target.metric("Regime-Based Target Exposure", f"{exposure:.0%}" if exposure is not None else "Unavailable")
+    with published:
+        st.metric("Latest published market session", session_label)
+        st.caption("Verified publication freshness")
+        st.markdown(f"**{publication_freshness(publication)}**")
+    st.caption("Filtered regime at the published close. Exposure targets the next session; it is not an ML forecast or a personalised recommendation.")
+
+
+def render_update_diagnostics(data):
+    publication = (data or {}).get("publication") or {}
+    root = Path(os.getenv("RISKBEX_OPERATIONAL_DIR", BASE_DIR / "runtime/main"))
+    update = publication.get("update_status")
+    update = update if isinstance(update, dict) else read_update_status(root)
+    if local_scheduler_active(root):
+        st.caption("Scheduler status: Active")
     else:
-        status = "Market data status unavailable"
-    st.caption(f"Last published market session: {publication['data_date']} · {status}")
-    st.caption("Automatic update status unavailable · Publication freshness does not verify automatic execution.")
+        st.caption("Scheduler status: Not verified")
+    # Pipeline timestamps can come from manual runs. Never label them automatic.
+    successful = (update.get("generated_at") if update.get("status") in {"published", "unchanged"}
+                  else publication.get("last_successful_update"))
+    st.caption(f"Last successful pipeline update: {successful or 'Unavailable'}")
+    outcomes = {"unchanged": "No new trading session", "published": "Published", "failed": "Failed"}
+    if update.get("status") in outcomes:
+        outcome = outcomes[update["status"]]
+        checked_at = update.get("generated_at")
+        st.caption(f"Latest update attempt: {checked_at} · {outcome}" if checked_at
+                   else f"Latest update attempt: {outcome}")
+
+    else:
+        st.caption("Latest update attempt: Unavailable")
+    st.caption(f"Publication freshness: {publication_freshness(publication)}")
 
 
 def show_landing():
     st.title("RISKBEX")
+    st.markdown("**Developed by Alejandro Palomo Morales**")
+    st.header("What if Machine Learning could help investors adapt to changing market risk?")
+    st.subheader("Pursue market returns. Manage downside risk.")
+    st.write("RISKBEX combines quantitative risk models, machine learning and an automated market-data pipeline to monitor the IBEX 35 and evaluate adaptive investment strategies designed to manage downside risk.")
+    render_price_regimes(welcome_history(df, data), landing=True)
+    render_welcome_publication(data)
+
     st.markdown(
         '<div class="welcome-highlights" aria-label="RISKBEX features">'
         '<span>Automated Daily Pipeline</span>'
@@ -573,17 +641,11 @@ def show_landing():
         '<span>IBEX 35 Market Data</span></div>',
         unsafe_allow_html=True,
     )
-    st.markdown("**Developed by Alejandro Palomo Morales**")
-    st.header("What if Machine Learning could help investors adapt to changing market risk?")
-    st.subheader("Pursue market returns. Manage downside risk.")
-    st.write("RISKBEX combines quantitative risk models, machine learning and an automated market-data pipeline to monitor the IBEX 35 and evaluate adaptive investment strategies designed to manage downside risk.")
-    render_welcome_publication(data)
-    st.info("Risk can be reduced, not eliminated. Signals can be wrong, losses remain possible and lower exposure can miss market gains. Profits are never guaranteed.")
     cards = list(zip(PAGES[1:], [
         "Learn how the risk signals work.", "Compare returns, losses and missed upside.",
         "Explore what a hypothetical investment experienced.", "Read the latest published risk conditions.",
         "Examine the evidence, methods and limitations."]))
-    for row in (cards[:3], cards[3:]):
+    for row in (cards,):
         for col, (page, description) in zip(st.columns(len(row), border=True), row):
             with col:
                 with st.container(height="stretch"):
@@ -591,6 +653,7 @@ def show_landing():
                     st.write(description)
                 st.button("Explore " + page, key="welcome_" + page,
                           on_click=select_page, args=(page,), width="stretch")
+    st.caption("Risk can be reduced, not eliminated. Signals can be wrong, losses remain possible and lower exposure can miss market gains. Profits are never guaranteed.")
     st.caption("Start with Performance to assess the evidence, then try the Investment Simulator with your own hypothetical capital. Historical simulations do not guarantee future performance.")
 
 
@@ -610,8 +673,6 @@ def show_overview():
             color=alt.condition(alt.datum.Session == 1, alt.value("#e69b83"), alt.value("#d6c2a8")))
         st.altair_chart(chart, use_container_width=True)
         st.caption("Illustration only, not IBEX data: the worst 1 of 20 days loses 8%, so this simplified tail average is −8%. Real losses may be worse.")
-        st.subheader("Volatility")
-        st.write("How bumpy is the ride? Volatility measures how widely daily returns move around their average. Higher volatility means larger swings in either direction. It helps compare uncertainty, but does not distinguish gains from losses.")
     with right:
         st.subheader("Drawdown")
         st.write("How far below a previous peak is an investment? A fall from €100 to €80 is a 20% drawdown. This shows the loss an investor would experience from that peak before recovery; recovery is not assured.")
@@ -621,6 +682,11 @@ def show_overview():
             y=alt.Y("Value:Q", title="Portfolio value (€)", scale=alt.Scale(domain=[70, 105])))
         st.altair_chart(chart, use_container_width=True)
         st.caption("Illustration only: peak €100 → trough €80 → partial recovery €95. The investment remains 5% below its peak.")
+    left, right = st.columns(2, gap="large")
+    with left:
+        st.subheader("Volatility")
+        st.write("How bumpy is the ride? Volatility measures how widely daily returns move around their average. Higher volatility means larger swings in either direction. It helps compare uncertainty, but does not distinguish gains from losses.")
+    with right:
         st.subheader("Market Regimes and Machine Learning")
         st.write("Are conditions calm or vulnerable? Market regimes group patterns in risk indicators into different risk states. The regime-based signal estimates the current state; Machine Learning estimates probabilities for the next session’s risk state. These are uncertain assessments, not predictions of an exact decline.")
     st.subheader("From risk signals to an investment decision")
@@ -778,7 +844,10 @@ def select_period(frame, key):
     return frame if days is None else frame[frame.date >= frame.date.max() - pd.Timedelta(days=days)]
 
 
-def render_price_regimes(frame):
+def render_price_regimes(frame, landing=False):
+    if landing:
+        st.subheader("IBEX 35 · A Year of Market Risk")
+        st.caption("Published closing prices and same-session filtered MAIN regimes. Up to 252 trading sessions; colours describe risk, not certain future price moves.")
     required = {"date", "ibex_close", "regime_label"}
     if frame.empty or not required.issubset(frame.columns):
         st.caption("IBEX 35 price and regime chart unavailable: aligned price history is not published.")
@@ -793,9 +862,15 @@ def render_price_regimes(frame):
         y=alt.Y("IBEX 35 Close:Q", scale=alt.Scale(zero=False)))
     chart = base.mark_line(color="#d6c2a8").encode() + base.mark_circle(size=28).encode(
         color=alt.Color("Market Regime:N", scale=alt.Scale(
-            domain=["Low Risk", "Medium Risk", "High Risk"], range=["#7fb58a", "#d2a450", "#be5a54"])),
+            domain=["Low Risk", "Medium Risk", "High Risk"], range=["#8fa99a", "#d2a450", "#c47b73"] if landing else ["#7fb58a", "#d2a450", "#be5a54"]),
+            legend=alt.Legend(orient="bottom", title=None) if landing else alt.Legend()),
         tooltip=[alt.Tooltip("Session:T"), alt.Tooltip("IBEX 35 Close:Q", format=",.2f"), "Market Regime:N"])
-    st.subheader("IBEX 35 and Market Regimes")
+    if landing:
+        chart = chart.properties(height=250).configure_view(strokeOpacity=0).configure_axis(
+            labelColor="#e7d8c5", titleColor="#e7d8c5", gridColor="#302b25",
+            tickCount=4).configure_legend(labelColor="#e7d8c5").configure(background="#171717")
+    else:
+        st.subheader("IBEX 35 and Market Regimes")
     st.altair_chart(chart.interactive(), use_container_width=True)
 
 
@@ -847,7 +922,6 @@ def render_operational_overview(data):
                 "ML Hard Strategy uses the most likely XGBoost next-session state. "
                 "ML Probability-Weighted combines regime exposures using forecast probabilities. "
                 "Targets are for the next market session; applied historical exposure may differ.")
-    st.caption(f"Last successful update: {publication.get('last_successful_update') or 'N/A'}")
 
 
 @st.cache_data(ttl=30)
@@ -1810,10 +1884,13 @@ def render_strategy_results():
     rows = performance_summary(metrics, net, selected)
     st.markdown(f'**Cumulative Growth · {basis}**')
     st.line_chart(pd.DataFrame(growth), use_container_width=True)
-    st.markdown(f'**Drawdown Comparison · {basis}**')
-    st.line_chart(pd.DataFrame(drawdown), use_container_width=True)
-    st.markdown('**Historical Applied Exposure**')
-    st.line_chart(pd.DataFrame(exposure), use_container_width=True)
+    downside, allocation = st.columns(2, gap="large")
+    with downside:
+        st.markdown(f'**Drawdown Comparison · {basis}**')
+        st.line_chart(pd.DataFrame(drawdown), use_container_width=True)
+    with allocation:
+        st.markdown('**Historical Applied Exposure**')
+        st.line_chart(pd.DataFrame(exposure), use_container_width=True)
     render_performance_reading(performance_summary(metrics, net), selected, payload, net)
     render_comparison_table(rows)
     st.caption('Transaction costs are summed log-return deductions, not a cash invoice or compounded performance drag.')
@@ -1962,17 +2039,6 @@ except (requests.RequestException, ValueError, KeyError):
     df = pd.DataFrame()
     st.warning("Market history is unavailable; other views remain available.")
 
-st.markdown(
-    f"""
-    <div class="topbar">
-        <div class="topbar-title">RISKBEX</div>
-        <div class="topbar-subtitle">
-            IBEX 35 Risk Intelligence · Publication Information Date: <b>{(data.get('publication') or {}).get('data_date', 'N/A') if data else 'N/A'}</b>
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
 
 PAGES = ["Welcome / Home", "Overview", "Performance", "Investment Simulator", "Risk Monitor", "Research & Methodology"]
 LEGACY_PAGES = {"Monitor": "Risk Monitor", "Explore": "Risk Monitor", "Results": "Performance",
@@ -2006,6 +2072,17 @@ sections = {}
 if current_page == "Welcome / Home":
     show_landing()
 else:
+    st.markdown(
+        f"""
+        <div class="topbar">
+            <div class="topbar-title">RISKBEX</div>
+            <div class="topbar-subtitle">
+                IBEX 35 Risk Intelligence · Publication Information Date: <b>{(data.get('publication') or {}).get('data_date', 'N/A') if data else 'N/A'}</b>
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
     st.button("Home", key="home", on_click=select_page, args=(PAGES[0],))
     st.session_state.primary_section = current_page
     st.radio("Sections", PAGES[1:], key="primary_section", horizontal=True,
@@ -2019,6 +2096,8 @@ else:
         render_investment_simulator(API_URL, load_decision_history, TECHNICAL_PUBLICATIONS)
     elif current_page == "Risk Monitor":
         st.caption("Read current-state estimates alongside next-session forecasts. Exposure is the share allocated to the index; probabilities express uncertainty. Always check the publication date and freshness before interpreting these observations.")
+        with st.expander("Update Diagnostics", expanded=False):
+            render_update_diagnostics(data)
         sections.update(zip(["Monitor", "Explore"], st.tabs(["Market Risk", "History & Decision Explorer"])))
     elif current_page == "Research & Methodology":
         sections.update(zip(["Models", "Tail Risk", "Research"],
@@ -2253,6 +2332,7 @@ if "Research" in sections:
             with open(selected_path, "rb") as f:
                 image_bytes = f.read()
 
+            st.caption("Original archived research figure; its embedded labels are preserved. The translated title and explanation above describe the same evidence.")
             st.image(image_bytes, caption=selected_figure, use_container_width=True)
             st.caption(
                 f"Figure Last Modified: {pd.to_datetime(selected_path.stat().st_mtime, unit='s')}"

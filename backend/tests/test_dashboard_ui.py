@@ -1,5 +1,8 @@
 """Small offline interface checks: no inference, providers or quantitative backtests."""
 import ast
+import json
+import os
+import tempfile
 from pathlib import Path
 import re
 import unittest
@@ -37,9 +40,9 @@ class DashboardUI(unittest.TestCase):
         pages = ['Overview', 'Performance', 'Investment Simulator', 'Risk Monitor', 'Research & Methodology']
         self.assertEqual([b.label for b in app.button], ['Explore ' + p for p in pages])
         self.assertFalse(app.tabs)
-        self.assertFalse(app.radio)
+        self.assertFalse([r for r in app.radio if r.key != 'ui_language'])
         self.assertFalse(app.get('link_button'))
-        self.assertTrue(any('not eliminated' in x.value for x in app.info))
+        self.assertTrue(any('not eliminated' in x.value for x in app.caption))
         overview = self.run_app(lambda *a, **k: Mock(json=lambda: {}, raise_for_status=lambda: None), 'Overview')
         headings = [x.value for x in overview.subheader]
         for heading in ['CVaR / Expected Shortfall', 'Volatility', 'Drawdown', 'Market Regimes and Machine Learning']:
@@ -53,13 +56,13 @@ class DashboardUI(unittest.TestCase):
 
     def test_welcome_publication_freshness(self):
         for freshness, current, label in [
-            ('current', True, 'Current publication'),
-            ('stale', False, 'Stale / non-current publication'),
-            ('historical', False, 'Stale / non-current publication'),
-            ('simulated', False, 'Stale / non-current publication'),
-            ('current', False, 'Stale / non-current publication'),
-            ('stale', True, 'Stale / non-current publication'),
-            (None, None, 'Market data status unavailable'),
+            ('current', True, 'Current'),
+            ('stale', False, 'Stale'),
+            ('historical', False, 'Stale'),
+            ('simulated', False, 'Stale'),
+            ('current', False, 'Stale'),
+            ('stale', True, 'Stale'),
+            (None, None, 'Unavailable'),
         ]:
             with self.subTest(freshness=freshness, current=current):
                 st.cache_data.clear()
@@ -67,8 +70,11 @@ class DashboardUI(unittest.TestCase):
                                            'is_current': current}, 'signal': {'last_valid_session': '2026-04-22'}}
                 app = self.run_app(lambda *a, **k: Mock(json=lambda: payload if '/latest-risk' in a[0] else [], raise_for_status=lambda: None))
                 captions = ' '.join(x.value for x in app.caption)
-                self.assertIn('Last published market session: 2026-04-23 · ' + label, captions)
-                self.assertIn('Automatic update status unavailable', captions)
+                self.assertIn('23 / 04 / 2026', [x.value for x in app.metric])
+                self.assertIn('**' + label + '**', [x.value for x in app.markdown])
+                self.assertNotIn('2026-04-23', captions)
+                self.assertNotIn('Scheduler', captions)
+                self.assertNotIn('Update Diagnostics', [x.label for x in app.expander])
                 self.assertNotIn('Automatically updated today', captions)
                 self.assertNotIn('Live', captions)
 
@@ -81,9 +87,78 @@ class DashboardUI(unittest.TestCase):
             st.cache_data.clear()
             app = self.run_app(response)
             captions = ' '.join(x.value for x in app.caption)
-            self.assertIn('Market data status unavailable', captions)
-            self.assertNotIn('Current publication', captions)
+            self.assertIn('Unavailable', [x.value for x in app.metric])
+            self.assertNotIn('Current', captions)
             self.assertNotIn('Last published market session:', captions)
+
+    def test_welcome_runtime_update_evidence(self):
+        publication = dict(data_date='2026-11-13', expected_data_date='2026-11-13',
+                           freshness='current', is_current=True,
+                           last_successful_update='2026-11-13T22:00:00+00:00')
+        response = lambda url, **kw: Mock(
+            json=lambda: {'publication': publication, 'signal': {'last_valid_session': '2026-11-13'}} if '/latest-risk' in url else [],
+            raise_for_status=lambda: None)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with patch.dict(os.environ, RISKBEX_OPERATIONAL_DIR=directory):
+                for outcome, label in [('unchanged', 'No new trading session'),
+                                       ('published', 'Published'), ('failed', 'Failed')]:
+                    with self.subTest(outcome=outcome):
+                        st.cache_data.clear()
+                        (root / 'status.json').write_text(json.dumps(dict(
+                            status=outcome, generated_at='2026-11-16T09:00:00+00:00',
+                            data_date='2026-11-13')))
+                        with patch('src.riskbex.presentation_status.local_scheduler_active', return_value=True):
+                            app = self.run_app(response, 'Risk Monitor')
+                        self.assertIn('Update Diagnostics', [x.label for x in app.expander])
+                        captions = ' '.join(x.value for x in app.caption)
+                        self.assertIn('Scheduler status: Active', captions)
+                        self.assertIn('Latest update attempt: 2026-11-16T09:00:00+00:00 · ' + label, captions)
+                        self.assertNotIn('Last successful automatic update:', captions)
+                        self.assertIn('Publication freshness: Current', captions)
+                        successful = '2026-11-13T22:00:00+00:00' if outcome == 'failed' else '2026-11-16T09:00:00+00:00'
+                        self.assertIn('Last successful pipeline update: ' + successful, captions)
+                        self.assertEqual(app.button(key='home').label, 'Home')
+                (root / 'status.json').write_text('broken JSON')
+                st.cache_data.clear()
+                app = self.run_app(response, 'Risk Monitor')
+                self.assertIn('Scheduler status: Not verified', ' '.join(x.value for x in app.caption))
+
+    def test_api_update_status_without_local_scheduler_evidence(self):
+        publication = dict(data_date='2026-11-13', freshness='current', is_current=True,
+                           expected_data_date='2026-11-13', update_status=dict(
+                               status='unchanged', data_date='2026-11-12', generated_at='2026-11-16T09:00:00Z'))
+        with patch('src.riskbex.presentation_status.local_scheduler_active', return_value=None):
+            app = self.run_app(lambda url, **kw: Mock(
+                json=lambda: {'publication': publication, 'signal': {'last_valid_session': '2026-11-13'}} if '/latest-risk' in url else [],
+                raise_for_status=lambda: None), 'Risk Monitor')
+        captions = ' '.join(x.value for x in app.caption)
+        self.assertIn('Latest update attempt:', captions)
+        self.assertIn('Scheduler status: Not verified', captions)
+        self.assertNotIn('No newer trading session available.', captions)
+
+    def test_scheduler_requires_live_lock_owner_not_just_a_file(self):
+        from src.riskbex.presentation_status import local_scheduler_active, read_update_status
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            proc = root / 'proc'
+            proc.mkdir()
+            lock = root / 'container-scheduler.lock'
+            lock.touch()
+            (proc / 'locks').write_text('')
+            self.assertIsNone(local_scheduler_active(root, proc))
+            stat = lock.stat()
+            identity = f'{os.major(stat.st_dev):02x}:{os.minor(stat.st_dev):02x}:{stat.st_ino}'
+            (proc / 'locks').write_text(f'1: FLOCK ADVISORY WRITE 123 {identity} 0 EOF')
+            (proc / '123').mkdir()
+            command = proc / '123/cmdline'
+            command.write_bytes(b'python\0/app/scripts/run_container_scheduler.py\0')
+            self.assertIs(local_scheduler_active(root, proc), True)
+            command.write_bytes(b'python\0other.py\0')
+            self.assertIsNone(local_scheduler_active(root, proc))
+            self.assertEqual(read_update_status(root), {})
+            (root / 'status.json').write_text('[]')
+            self.assertEqual(read_update_status(root), {})
 
     def test_unavailable_api_keeps_all_content_sections(self):
         app = self.run_app(lambda *a, **k: (_ for _ in ()).throw(requests.ConnectionError('offline')), 'Monitor')
@@ -139,7 +214,7 @@ class DashboardUI(unittest.TestCase):
                 self.assertEqual(app.radio(key='primary_section').value, page)
                 app.button(key='home').click().run()
                 self.assertFalse(app.exception, str(app.exception))
-                self.assertFalse(app.radio)
+                self.assertFalse([r for r in app.radio if r.key != 'ui_language'])
                 self.assertFalse(app.tabs)
         with patch('requests.get', side_effect=offline):
             app.button(key='welcome_Overview').click().run()
@@ -149,7 +224,7 @@ class DashboardUI(unittest.TestCase):
 
     def test_responsive_card_structure(self):
         app = self.run_app(lambda *a, **k: Mock(json=lambda: {}, raise_for_status=lambda: None))
-        columns = app.get('column')
+        columns = [c for c in app.get('column') if c.button]
         self.assertEqual(len(columns), 5)
         for column in columns:
             self.assertEqual(len(column.button), 1)
@@ -157,7 +232,11 @@ class DashboardUI(unittest.TestCase):
             self.assertEqual(len(column.markdown), 2)
         source = (ROOT / 'dashboard.py').read_text()
         landing = source[source.index('def show_landing'):source.index('def show_overview')]
-        self.assertIn('cards[:3], cards[3:]', landing)
+        self.assertIn('for row in (cards,):', landing)
+        self.assertNotIn('hero, context', landing)
+        self.assertNotIn('st.container(border=True)', landing)
+        self.assertIn('max-width: 1680px', source)
+        self.assertIn('@media (max-width: 640px)', source)
         self.assertIn('st.columns(len(row), border=True)', landing)
         self.assertIn('st.container(height="stretch")', landing)
         self.assertNotIn('link_button', landing)
