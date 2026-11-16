@@ -1,5 +1,6 @@
 """Explicit immutable export of public presentation assets; never modifies a store."""
 import json
+from datetime import date
 from pathlib import Path
 import shutil
 import tempfile
@@ -16,6 +17,28 @@ RESEARCH = (
 FIGURES = ('daily_returns_ibex35.png', 'volatility_vs_downside_60d.png',
            'var_cvar_60d.png', 'drawdown_ibex35.png', 'skew_60d_series.png',
            'ret_risk_60d_series.png')
+
+
+def verify_approved_bundle(root, approval_path):
+    """Verify the separately Git-approved identity, date and full payload."""
+    approval = json.loads(Path(approval_path).read_text())
+    if not isinstance(approval, dict) or set(approval) != {'format', 'snapshot_sha256', 'version', 'data_date'}:
+        raise ValueError('Invalid publication approval schema.')
+    if type(approval['format']) is not int or approval['format'] != 1:
+        raise ValueError('Unsupported approval format.')
+    for field in ['snapshot_sha256', 'version']:
+        value = approval[field]
+        if not isinstance(value, str) or len(value) != 64 or any(c not in '0123456789abcdef' for c in value):
+            raise ValueError('Approval requires a SHA-256 identity.')
+    if not isinstance(approval['data_date'], str):
+        raise ValueError('Invalid approval market date.')
+    date.fromisoformat(approval['data_date'])
+    inventory = verify_bundle(root, approval['snapshot_sha256'])
+    version = VersionStore(Path(root) / 'store').current()
+    manifest = json.loads((version / 'manifest.json').read_text())
+    if inventory['version'] != approval['version'] or manifest['data_date'] != approval['data_date']:
+        raise ValueError('Approval and publication version/date differ.')
+    return approval
 
 
 def verify_bundle(root, expected_sha256=None):
