@@ -1,30 +1,54 @@
-name: Daily RISKBEX Update
+name: MAIN controlled offline validation
 
+# Intentionally no schedule, push trigger, live downloads or publication.
+# Install this workflow on main; execute the reviewed release checkout explicitly.
 on:
-  schedule:
-    - cron: '0 18 * * *'
   workflow_dispatch:
+    inputs:
+      release_sha:
+        description: 'Reviewed release commit SHA / SHA revisado de la rama de despliegue'
+        required: true
+        type: string
 
 permissions:
   contents: read
 
+concurrency:
+  group: riskbex-cloud-publication
+  cancel-in-progress: false
+
 jobs:
-  daily-update:
-    runs-on: ubuntu-latest
-
+  offline-validation:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+      PYTHONPATH: backend
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          python-version: '3.11'
-
-      - name: Install dependencies
-        run: pip install -r backend/requirements.txt
-
-      - name: Run daily update pipeline
+          ref: release/streamlit-rc1
+          persist-credentials: false
+      - name: Verify reviewed release before installing or executing its code
+        env:
+          EXPECTED_RELEASE_SHA: ${{ inputs.release_sha }}
+        shell: bash
         run: |
-          cd backend
-          python scripts/run_daily_update.py
+          [[ "$EXPECTED_RELEASE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$EXPECTED_RELEASE_SHA"
+          test -z "$(git status --porcelain)"
+          git rev-parse HEAD
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.11.14'
+      - name: Install pinned frozen runtime
+        run: python -m pip install -r backend/requirements-docker.lock
+      - name: Check dependency consistency
+        run: python -m pip check
+      - name: Verified bootstrap and guarded offline acceptance
+        env:
+          EXPECTED_RELEASE_SHA: ${{ inputs.release_sha }}
+        run: python backend/scripts/run_actions_offline.py --expected-release-sha "$EXPECTED_RELEASE_SHA"
