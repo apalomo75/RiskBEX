@@ -1,0 +1,31 @@
+name: RISKBEX runner diagnostic
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# No concurrency group: independent of riskbex-cloud-publication.
+jobs:
+  runner-diagnostic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Print UTC date
+        shell: bash
+        run: date -u '+%Y-%m-%dT%H:%M:%SZ'
+      - name: Print basic runner environment
+        shell: bash
+        run: |
+          printf 'Runner OS: %s\nRunner architecture: %s\n' "$RUNNER_OS" "$RUNNER_ARCH"
+          printf 'Workflow: %s\nRun ID: %s\nRun attempt: %s\nRef: %s\n' "$GITHUB_WORKFLOW" "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_REF"
+          uname -srm
+      - name: Check Python availability
+        shell: bash
+        run: |
+          command -v python3
+          python3 --version
+      - name: Confirm runner diagnostic
+        shell: bash
+        run: echo "RISKBEX GitHub runner diagnostic passed"
