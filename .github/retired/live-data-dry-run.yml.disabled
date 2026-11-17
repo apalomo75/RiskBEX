@@ -86,7 +86,7 @@ jobs:
         run: |
           umask 077
           python backend/scripts/run_actions_live_dry_run.py --source-root . --work "$RUNNER_TEMP/riskbex-live-candidate" --authorize-live-download
-      # Deliberately no upload-artifact, cache, summary payload, commit or push.
+      # Only the allowlisted execution JSON reaches logs; no private report/artifact, cache, commit or push.
       - name: Remove private candidate and report
         if: always()
         run: rm -rf -- "$RUNNER_TEMP/riskbex-live-candidate"
