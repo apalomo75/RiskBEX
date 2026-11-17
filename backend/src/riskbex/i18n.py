@@ -19,9 +19,8 @@ CASEFOLD_ES = {key.casefold(): value for key, value in ES.items()}
 
 
 def language():
-    if get_script_run_ctx(suppress_warning=True) is None:
-        return 'en'
-    return streamlit.session_state.get('ui_language', 'en')
+    """Public presentation always uses English, including existing sessions."""
+    return 'en'
 
 
 def normalize(text):
@@ -224,16 +223,5 @@ def _select_language():
 
 
 def render_language_selector():
-    """Native segments; language names remain usable without flag rendering."""
-    if 'ui_language' not in streamlit.session_state:
-        requested = streamlit.query_params.get('lang', 'en')
-        streamlit.session_state.ui_language = requested if requested in LANGUAGES else 'en'
-    streamlit.session_state._last_ui_language = streamlit.session_state.ui_language
-    # The URL initializes a new session; thereafter session state is authoritative.
-    # Also normalize missing/invalid URL values without touching the current view.
-    if streamlit.query_params.get('lang') != streamlit.session_state.ui_language:
-        streamlit.query_params['lang'] = streamlit.session_state.ui_language
-    with streamlit.container(horizontal=True, horizontal_alignment='right'):
-        streamlit.segmented_control('Language / Idioma', list(LANGUAGES), key='ui_language',
-                        format_func=LANGUAGES.get, on_change=_select_language,
-                        selection_mode='single', label_visibility='collapsed', width='content')
+    """Keep the existing dashboard hook without exposing a language switch."""
+    return None
