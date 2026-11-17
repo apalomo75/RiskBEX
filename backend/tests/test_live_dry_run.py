@@ -69,7 +69,7 @@ class LiveDryRunTests(unittest.TestCase):
             self.assertEqual(json.loads((base / 'work/dry-run-report.json').read_text())['publication'], 'disabled')
 
     def test_workflow_is_manual_read_only_and_no_exposure(self):
-        workflow = (ROOT / '.github/workflows/live-data-dry-run.yml').read_text()
+        workflow = (ROOT / '.github/retired/live-data-dry-run.yml.disabled').read_text()
         for forbidden in ['\n  schedule:', 'uses: actions/upload-artifact', 'git push', '--publish', 'contents: write']:
             self.assertNotIn(forbidden, workflow)
         for required in ['workflow_dispatch:', 'contents: read', 'persist-credentials: false',

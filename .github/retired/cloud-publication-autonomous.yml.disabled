@@ -1,0 +1,199 @@
+name: MAIN protected cloud publication (AUTONOMOUS TEMPLATE — NOT INSTALLED)
+on:
+  schedule:
+    - cron: '17 19 * * 1-5'
+    - cron: '47 21 * * 1-5'
+  workflow_dispatch:
+    inputs:
+      controller_sha:
+        description: Reviewed main controller SHA (40 hex characters)
+        required: true
+        type: string
+      release_sha:
+        description: Reviewed current release head (40 hex characters)
+        required: true
+        type: string
+      authorize_live_download:
+        description: Separately authorize retrieval and protected publication
+        required: true
+        default: false
+        type: boolean
+permissions:
+  contents: read
+concurrency:
+  group: riskbex-protected-publication-v2
+  cancel-in-progress: false
+jobs:
+  candidate:
+    if: github.ref == 'refs/heads/main' && (inputs.authorize_live_download || (github.event_name == 'schedule' && vars.RISKBEX_AUTONOMOUS_AUTHORIZED == 'true')) && vars.RISKBEX_PUBLICATION_ENABLED == 'true'
+    environment: ${{ github.event_name == 'schedule' && 'publication-candidate-auto' || 'publication-candidate' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    outputs:
+      release_sha: ${{ steps.release.outputs.release_sha }}
+      controller_sha: ${{ github.sha }}
+      generated: ${{ steps.build.outputs.generated }}
+      cipher_sha: ${{ steps.encrypt.outputs.cipher_sha }}
+    env:
+      PYTHONPATH: backend
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+    defaults:
+      run:
+        shell: bash --noprofile --norc -euo pipefail {0}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify controller
+        env:
+          CONTROLLER: ${{ inputs.controller_sha || github.sha }}
+        run: |
+          [[ "$CONTROLLER" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$CONTROLLER"
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: release/streamlit-rc1
+          path: publication-source
+          persist-credentials: false
+      - name: Verify reviewed release
+        id: release
+        env:
+          RELEASE: ${{ inputs.release_sha }}
+        run: |
+          if test "$GITHUB_EVENT_NAME" = schedule; then
+            RELEASE="$(git -C publication-source rev-parse HEAD)"
+          fi
+          [[ "$RELEASE" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git -C publication-source rev-parse HEAD)" = "$RELEASE"
+          echo "release_sha=$RELEASE" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11.14'
+      - name: Frozen runtime and offline gates
+        working-directory: publication-source
+        run: |
+          python -m pip install -r backend/requirements-docker.lock
+          python -m pip check
+          python backend/scripts/run_actions_offline.py --expected-release-sha '${{ steps.release.outputs.release_sha }}'
+          python -m unittest tests.test_publication_control tests.test_live_dry_run
+      - name: Build private candidate and safe summary
+        id: build
+        working-directory: publication-source
+        env:
+          RELEASE: ${{ steps.release.outputs.release_sha }}
+          CONTROLLER: ${{ github.sha }}
+        run: |
+          umask 077
+          python backend/scripts/run_cloud_publication.py candidate --root . --work "$RUNNER_TEMP/candidate" --head "$RELEASE" --controller "$CONTROLLER" > "$RUNNER_TEMP/execution-summary.json"
+          cat "$RUNNER_TEMP/execution-summary.json" >> "$GITHUB_STEP_SUMMARY"
+          if test -f "$RUNNER_TEMP/candidate/custody.json"; then
+            echo 'generated=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Encrypt minimal custody payload
+        id: encrypt
+        if: steps.build.outputs.generated == 'true'
+        env:
+          CUSTODY_KEY: ${{ secrets.PUBLICATION_CUSTODY_KEY }}
+        run: |
+          umask 077
+          [[ "$CUSTODY_KEY" =~ ^[0-9a-f]{64}$ ]]
+          tar -C "$RUNNER_TEMP/candidate" -cf "$RUNNER_TEMP/candidate.tar" candidate approval.json custody.json
+          printf '%s' "$CUSTODY_KEY" | gpg --batch --pinentry-mode loopback --passphrase-fd 0 --symmetric --cipher-algo AES256 --output "$RUNNER_TEMP/candidate.gpg" "$RUNNER_TEMP/candidate.tar"
+          echo "cipher_sha=$(sha256sum "$RUNNER_TEMP/candidate.gpg" | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: steps.build.outputs.generated == 'true'
+        with:
+          name: encrypted-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/candidate.gpg
+          retention-days: 1
+          if-no-files-found: error
+      - name: Safe failure summary and cleanup
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/execution-summary.json"; then cat "$RUNNER_TEMP/execution-summary.json"; fi
+          rm -rf -- "$RUNNER_TEMP/candidate" "$RUNNER_TEMP/candidate.tar" "$RUNNER_TEMP/candidate.gpg"
+  promote:
+    needs: candidate
+    if: needs.candidate.outputs.generated == 'true' && vars.RISKBEX_PUBLICATION_ENABLED == 'true'
+    environment: ${{ github.event_name == 'schedule' && 'public-publication-auto' || 'public-publication' }}
+    permissions:
+      contents: write
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: backend
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+      MKL_NUM_THREADS: '1'
+    defaults:
+      run:
+        shell: bash --noprofile --norc -euo pipefail {0}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: release/streamlit-rc1
+          persist-credentials: false
+      - name: Verify unchanged release before execution
+        env:
+          RELEASE: ${{ needs.candidate.outputs.release_sha }}
+        run: |
+          [[ "$RELEASE" =~ ^[0-9a-f]{40}$ ]]
+          test "$(git rev-parse HEAD)" = "$RELEASE"
+          test -z "$(git status --porcelain)"
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        with:
+          python-version: '3.11.14'
+      - name: Frozen runtime and offline gates
+        run: |
+          python -m pip install -r backend/requirements-docker.lock
+          python -m pip check
+          python backend/scripts/run_actions_offline.py --expected-release-sha '${{ needs.candidate.outputs.release_sha }}'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: encrypted-candidate-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/cipher
+      - name: Verify ciphertext and decrypt
+        env:
+          CIPHER_SHA: ${{ needs.candidate.outputs.cipher_sha }}
+          CUSTODY_KEY: ${{ secrets.PUBLICATION_CUSTODY_KEY }}
+        run: |
+          umask 077
+          [[ "$CIPHER_SHA" =~ ^[0-9a-f]{64}$ ]]
+          test "$(sha256sum "$RUNNER_TEMP/cipher/candidate.gpg" | cut -d ' ' -f 1)" = "$CIPHER_SHA"
+          [[ "$CUSTODY_KEY" =~ ^[0-9a-f]{64}$ ]]
+          printf '%s' "$CUSTODY_KEY" | gpg --batch --pinentry-mode loopback --passphrase-fd 0 --output "$RUNNER_TEMP/candidate.tar" --decrypt "$RUNNER_TEMP/cipher/candidate.gpg"
+          python - <<'PY'
+          import os, pathlib, tarfile
+          destination = pathlib.Path(os.environ['RUNNER_TEMP']) / 'candidate'
+          destination.mkdir()
+          with tarfile.open(destination.parent / 'candidate.tar') as archive:
+              if any(not (m.isfile() or m.isdir()) for m in archive.getmembers()):
+                  raise ValueError('Non-regular custody entry')
+              archive.extractall(destination, filter='data')
+          PY
+      - name: Revalidate and publish one atomic commit
+        env:
+          RELEASE: ${{ needs.candidate.outputs.release_sha }}
+          CONTROLLER: ${{ needs.candidate.outputs.controller_sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name 'riskbex-publication'
+          git config user.email 'riskbex-publication@users.noreply.github.com'
+          # Credentials are available only for this step and never stored in Git config.
+          ASKPASS="$RUNNER_TEMP/git-askpass"
+          cat > "$ASKPASS" <<'SH'
+          #!/bin/sh
+          case "$1" in *Username*) printf '%s\n' x-access-token;; *) printf '%s\n' "$GH_TOKEN";; esac
+          SH
+          chmod 700 "$ASKPASS"
+          export GIT_ASKPASS="$ASKPASS" GIT_TERMINAL_PROMPT=0
+          python backend/scripts/run_cloud_publication.py promote --root . --work "$RUNNER_TEMP/candidate" --head "$RELEASE" --controller "$CONTROLLER"
+      - name: Cleanup and failure alert
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          rm -rf -- "$RUNNER_TEMP/candidate" "$RUNNER_TEMP/candidate.tar" "$RUNNER_TEMP/cipher" "$RUNNER_TEMP/git-askpass"
+          if test "$JOB_STATUS" != success; then echo '::error::Publication failed. Inspect release head before any retry; never force push.'; fi

@@ -1,0 +1,47 @@
+{
+  "reviewed_on": "2026-11-17",
+  "calendar": {
+    "source": "https://www.bolsasymercados.es/es/bme-exchange/negociar/calendario-del-mercado.html",
+    "observed_year": 2026,
+    "official_2027_dates_verified": false,
+    "observed_closures": [
+      "2026-01-01",
+      "2026-04-03",
+      "2026-04-06",
+      "2026-05-01",
+      "2026-12-25"
+    ],
+    "observed_half_days": {
+      "2026-12-24": "14:00 Europe/Madrid",
+      "2026-12-31": "14:00 Europe/Madrid"
+    },
+    "searches": [
+      "site.bolsasymercados.es \"2027\" \"trading sessions\"",
+      "site.bolsasymercados.es \"2027\" \"calendario de sesiones\""
+    ],
+    "finding": "Official page still describes 2026; targeted official-domain searches did not establish a 2027 circular. Absence of discovery is not proof of non-publication."
+  },
+  "rights": [
+    {
+      "source": "https://www.bolsasymercados.es/en/bme-exchange/prices-and-markets/market-data-services/documentation/data-feeds.html",
+      "finding": "Current framework identifies separate display and non-display contracts effective 2026-08-23. No project-specific licence was supplied or verified."
+    },
+    {
+      "source": "https://github.com/ranaroussi/yfinance",
+      "finding": "Project directs data users to Yahoo terms and describes personal API use. Software licence does not establish data distribution rights."
+    },
+    {
+      "source": "https://legal.yahoo.com/us/en/yahoo/terms/otos/index.html",
+      "retrieval": "HTTP 999; terms could not be verified. No permission inferred."
+    }
+  ],
+  "live_run": {
+    "url": "https://github.com/apalomo75/RiskBEX/actions/runs/44092452719",
+    "job_id": 134070816572,
+    "live_step_started_utc": "2026-11-17T13:27:19.100Z",
+    "live_step_finished_utc": "2026-11-17T13:27:20.264Z",
+    "offline_tests": 45,
+    "offline_result": "passed",
+    "finding": "No-op inferred from approved 2026-11-16 session, execution before 20:00 Europe/Madrid cutoff, and candidate early-return implementation. No private report survives."
+  }
+}
