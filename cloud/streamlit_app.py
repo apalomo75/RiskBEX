@@ -36,7 +36,7 @@ try:
         raise ValueError('An approved snapshot identity is required.')
     inventory = verify_bundle(bundle, expected_digest)
 except (OSError, ValueError, KeyError, TypeError) as exc:
-    st.error('A complete verified publication snapshot is required. Contact the application operator. / Se necesita una publicación completa y verificada. Contacte con el administrador.')
+    st.error('A complete verified publication snapshot is required. Contact the application operator.')
     st.stop()
 
 if approved_date:

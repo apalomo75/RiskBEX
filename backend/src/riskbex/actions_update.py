@@ -14,6 +14,7 @@ from src.riskbex.pipeline.service import update_main, verify_gate
 from src.riskbex.pipeline.store import VersionStore, digest, write_json
 
 BRANCH = 'release/streamlit-rc1'
+PRIVATE_BRANCH = 'state/main-daily'
 
 
 def approved_bundle(root):
@@ -70,7 +71,19 @@ def candidate(root, work, *, now, provider=None):
     return result
 
 
-def promote(root, work, expected_head):
+def verify_predecessor(root, expected_head, *, private=False):
+    """Reject stale or dirty checkouts before retrieval as well as promotion."""
+    def git(*args):
+        return subprocess.check_output(['git', '-C', str(root), *args], text=True).strip()
+    branch = PRIVATE_BRANCH if private else BRANCH
+    if git('branch', '--show-current') != branch or git('rev-parse', 'HEAD') != expected_head:
+        raise ValueError('Unexpected publication branch/head.')
+    if git('status', '--porcelain'):
+        raise ValueError('Publication checkout must be clean.')
+    return branch
+
+
+def promote(root, work, expected_head, *, require_live=False, private=False):
     """Explicit future publishing operation, never invoked by the offline workflow.
 
     One Git commit contains the complete payload and trust anchor. Normal push is
@@ -80,10 +93,10 @@ def promote(root, work, expected_head):
     root, work = Path(root).resolve(), Path(work).resolve()
     def git(*args):
         return subprocess.check_output(['git', '-C', str(root), *args], text=True).strip()
-    if git('branch', '--show-current') != BRANCH or git('rev-parse', 'HEAD') != expected_head:
-        raise ValueError('Unexpected publication branch/head.')
-    if git('status', '--porcelain'):
-        raise ValueError('Publication checkout must be clean.')
+    branch = verify_predecessor(root, expected_head, private=private)
+    from src.riskbex.publication_control import verify_rights, verify_provenance
+    if not private:
+        verify_rights(root)
     old = approved_bundle(root)
     new = json.loads((work / 'approval.json').read_text())
     inventory = verify_bundle(work / 'candidate', new['snapshot_sha256'])
@@ -99,6 +112,7 @@ def promote(root, work, expected_head):
         raise ValueError('Non-advancing publication rejected.')
     if manifest['previous_version'] != old['version']:
         raise ValueError('Candidate does not extend current publication.')
+    verify_provenance(root, work, old, require_live=require_live)
     # Local failures leave remote unchanged. Discard failed disposable checkout.
     shutil.rmtree(root / 'cloud/publication')
     shutil.copytree(work / 'candidate', root / 'cloud/publication')
@@ -106,5 +120,5 @@ def promote(root, work, expected_head):
     approved_bundle(root)
     git('add', '-f', '--', 'cloud/publication', 'cloud/approval.json')
     git('commit', '-m', 'Publish validated MAIN session ' + new['data_date'])
-    git('push', 'origin', 'HEAD:refs/heads/' + BRANCH)
+    git('push', 'origin', 'HEAD:refs/heads/' + branch)
     return 'published'
