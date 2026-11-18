@@ -10,6 +10,7 @@ from unittest.mock import patch
 import pandas as pd
 
 from scripts.run_daily_update import FileProvider
+from tests.publication_fixtures import ApprovedPublication
 from src.riskbex.actions_update import candidate, promote, approved_bundle, PRIVATE_BRANCH, BRANCH
 from src.riskbex.pipeline.store import VersionStore
 
@@ -31,13 +32,14 @@ class DailyStateTests(unittest.TestCase):
             for name in ['cloud/publication', 'backend/model_packages/main-v1', 'backend/config']:
                 shutil.copytree(ROOT / name, root / name)
             shutil.copyfile(ROOT / 'cloud/approval.json', root / 'cloud/approval.json')
-            current = VersionStore(root / 'cloud/publication/store').current()
-            prices = pd.read_csv(current / 'prices.csv', float_precision='round_trip')
-            extra = pd.read_csv(ROOT / 'backend/tests/fixtures/live-dry-run/extension.csv')
-            extra2 = pd.DataFrame({'date': ['2026-11-18'], 'ibex_close': [float(extra.ibex_close.iloc[-1]) + 1]})
+            publication = ApprovedPublication(root)
+            first_session = publication.calendar.next_session(publication.session)
+            second_session = publication.calendar.next_session(first_session)
+            prices = publication.history()
+            extension = publication.extension(prices, [first_session, second_session])
             provider = base / 'prices.csv'
-            pd.concat([prices, extra, extra2]).to_csv(provider, index=False)
-            remote = {'head': 'a' * 40, 'approval': approved_bundle(root)}
+            pd.concat([prices, extension]).to_csv(provider, index=False)
+            remote = {'head': 'a' * 40, 'approval': publication.approval}
             def git(command, **kwargs):
                 args = command[3:]
                 if args == ['branch', '--show-current']: return branch
@@ -48,28 +50,29 @@ class DailyStateTests(unittest.TestCase):
                     return ''
                 raise AssertionError(args)
             first = base / 'day1'
-            candidate(root, first, now='2026-11-17T22:00Z', provider=FileProvider(provider))
+            candidate(root, first, now=publication.clock(first_session), provider=FileProvider(provider))
             with patch('subprocess.check_output', side_effect=git):
                 self.assertEqual(promote(root, first, 'a' * 40, private=private), 'published')
                 with self.assertRaisesRegex(ValueError, 'branch/head'):
                     promote(root, first, 'a' * 40, private=private)
             with patch.object(FileProvider, 'fetch', side_effect=AssertionError('Repeated run fetched')):
-                repeated = candidate(root, base / 'repeat', now='2026-11-17T22:00Z', provider=FileProvider(provider))
+                repeated = candidate(root, base / 'repeat', now=publication.clock(first_session), provider=FileProvider(provider))
             self.assertEqual(repeated['status'], 'unchanged')
+            self.assertEqual(remote['approval']['data_date'], first_session.date().isoformat())
             old = approved_bundle(root)
             incomplete = base / 'missing.csv'
-            pd.concat([prices, extra2]).to_csv(incomplete, index=False)
+            pd.concat([prices, extension.iloc[1:]]).to_csv(incomplete, index=False)
             with self.assertRaisesRegex(ValueError, 'Incomplete'):
-                candidate(root, base / 'missing', now='2026-11-18T22:00Z', provider=FileProvider(incomplete))
+                candidate(root, base / 'missing', now=publication.clock(second_session), provider=FileProvider(incomplete))
             self.assertEqual(approved_bundle(root), old)
             second = base / 'day2'
-            result = candidate(root, second, now='2026-11-18T22:00Z', provider=FileProvider(provider))
+            result = candidate(root, second, now=publication.clock(second_session), provider=FileProvider(provider))
             self.assertEqual(result['new_sessions'], 1)
             manifest = json.loads((VersionStore(second / 'candidate/store').current() / 'manifest.json').read_text())
             self.assertEqual(manifest['previous_version'], old['version'])
             with patch('subprocess.check_output', side_effect=git):
                 self.assertEqual(promote(root, second, 'b' * 40, private=private), 'published')
-            self.assertEqual(remote['approval']['data_date'], '2026-11-18')
+            self.assertEqual(remote['approval']['data_date'], second_session.date().isoformat())
 
 
 class PublicationStateTests(unittest.TestCase):

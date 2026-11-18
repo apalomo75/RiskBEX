@@ -64,11 +64,10 @@ class PublicDailyTests(unittest.TestCase):
         from scripts.run_daily_update import FileProvider
         from src.riskbex.actions_update import approved_bundle, BRANCH
         from src.riskbex.pipeline.provider import YahooProvider
-        from src.riskbex.pipeline.store import VersionStore
+        from tests.publication_fixtures import ApprovedPublication
         from src.riskbex.publication_control import verify_provenance
 
         source = Path(__file__).resolve().parents[2]
-        now = '2026-11-17T22:00Z'
         with tempfile.TemporaryDirectory() as temp:
             base = Path(temp)
             root = base / 'release'
@@ -79,9 +78,11 @@ class PublicDailyTests(unittest.TestCase):
             config.mkdir()
             for name in ['actions-regression.json', 'bme-2026.json']:
                 shutil.copyfile(source / 'backend/config' / name, config / name)
-            prices = pd.read_csv(VersionStore(root / 'cloud/publication/store').current() / 'prices.csv',
-                                 float_precision='round_trip')
-            extra = pd.read_csv(source / 'backend/tests/fixtures/live-dry-run/extension.csv')
+            publication = ApprovedPublication(root)
+            session = publication.calendar.next_session(publication.session)
+            now = publication.clock(session)
+            prices = publication.history()
+            extra = publication.extension(prices, [session])
             provider_file = base / 'prices.csv'
             pd.concat([prices, extra]).to_csv(provider_file, index=False)
             remote = {'head': 'a' * 40}
@@ -108,7 +109,7 @@ class PublicDailyTests(unittest.TestCase):
                        side_effect=lambda *a, **kw: verify_provenance(*a, **kw, now=now)):
                 first = execute(root, base / 'first', 'a' * 40, now=now)
                 self.assertEqual(first['publication'], 'published')
-                self.assertEqual(first['published_session'], '2026-11-17')
+                self.assertEqual(first['published_session'], session.date().isoformat())
                 self.assertEqual(approved_bundle(root)['version'], first['published_version'])
                 fetch.assert_called_once()
                 fetch.reset_mock()
