@@ -19,19 +19,19 @@
   },
   "calendar_sha256": "7d855f22f0a2cb88c54980b2980dc10ed91e53c980e02591afed907b2dc747c3",
   "cost_rate": 0.001,
-  "data_date": "2026-11-16",
-  "downloaded_at": "2026-11-16T19:15:03.113219+00:00",
+  "data_date": "2026-11-17",
+  "downloaded_at": "2026-11-18T15:07:10.564309+00:00",
   "engine": "MAIN",
   "files": {
-    "backtest.csv": "220b926dd3cc1e5994db14f3010c44c0805f366e8490a1a74a4ed346aa51582e",
-    "features.csv": "04d220a257782d786f74e1a20395158ef01c5ba3c91afb6e59f17971ee798f3f",
-    "latest.json": "4eb04665601b28cbb7d00ce8f60990af8f4a1dfd3dba8702a3c2eb0c7435f979",
-    "metrics.csv": "b22dc7f55eb41b3cd6b8359ee1b8850ffe190faa3b5c3e28030fd40894ab3db3",
-    "prices.csv": "5e9ead00a93d7163edb2f4e6f9ed87c59bc5eb0623bb3b3dae55bab0bc65ec2c",
-    "signals.csv": "8297c9bc10aa819a028c5022048fbb9658e7ec06a1cd265e8bb8a80055441baf",
-    "turnover.csv": "57468423ebbabf8c48f528b632710357a6adb74872c778a9693c2ea1015b0b42"
+    "backtest.csv": "76785e1e2739beb5fc95eeb4745d379550ab575e75921b28e8066ddeda77c1d4",
+    "features.csv": "4ba425454f7b11472a7adbacd5f45c80b5997e3558a1eabc22dd690b196eb105",
+    "latest.json": "1ac12ee5a5dcb39097038cea28545bf6dd0c5b616fa3bc3221b76a1334583a85",
+    "metrics.csv": "d383f5e4368027c73201dcac4be31a6221ab780ef2bba6178282096b2e1318ba",
+    "prices.csv": "2c1897677827a9f5db9c6fd62cf9661694b575fefe2f195c6e73154bce402573",
+    "signals.csv": "2ad549200a13e98a21c49b4e1ff963e95958d2ea3828927aa2013e81aac1ab05",
+    "turnover.csv": "7ee8d21d3c8f1a8dc3a0ea32b3e6038721b5ca8a2d92060cf6da4c5c605775da"
   },
-  "generated_at": "2026-11-16T19:15:03.113219+00:00",
+  "generated_at": "2026-11-18T15:07:10.564309+00:00",
   "implementation_sha256": {
     "backtesting/costs.py": "16363467767b15fff9a4ad554f3fad372d82467d59dae31dbb5b28a1eae06439",
     "backtesting/exposures.py": "09a2ce1a74ea23ec5abc6a47a361983d603b2e8dfd460c71421da327948c65b2",
@@ -57,7 +57,7 @@
     "pipeline/store.py": "00b9b9bcdd4590972c11db695a4edc4ebda49cfbf06bef416f4c55d07c3c201e",
     "regimes/persistence.py": "00ce10de778f58d7bd2e41d9432ece824f0bedc9d2d2f36b63e04dab634049c3"
   },
-  "last_signal_date": "2026-11-16",
+  "last_signal_date": "2026-11-17",
   "model_hashes": {
     "markov/cvar_mapping.json": "c6a5d042a4101029cd5b35a33d90dee4522b0034d77ba017ddf5499548a0d2f2",
     "markov/metadata.json": "5a510967585e8662e525882163854587702d3f35cef12a19338fb9fe755fce50",
@@ -70,14 +70,14 @@
   "model_manifest_sha256": "1e63e51d70278a60188db1351f5f5e081f8cfa011d82ce0012317ac4f676a68c",
   "new_sessions": 1,
   "package_id": "riskbex-main-v1",
-  "previous_version": "ac2cacb20414f023d166f91d2fe53ad99ae600bf1c0655f2d88bde349be2a520",
-  "price_sha256": "6ac7247d44a47bc95cf894210a9ec0f17a1da5e3f0014684b4d110e5b69f66d6",
+  "previous_version": "7aa57e33635247917fa6b2e375fe2581eed428283e4509a39a00c201a0b46819",
+  "price_sha256": "2a4caf8d89e07539a0bb5a059ba924b649fbd4cbe6b6794e7ba45876e88d3cb4",
   "provenance": "frozen MAIN parameters; causal-v1 predictions; training-only CVaR; no fit",
   "regression_receipt_sha256": "526b4a94bf1e3dde0a20124249632f421b39f7620db789376a736fb82f788fc4",
   "return_convention": "log; target(t-1) times return(t); first OOS dropped",
   "schema_version": 1,
   "source": "yahoo-finance:^IBEX:1d:auto_adjust=True",
   "status": "validated",
-  "target_session_date": "2026-11-17",
-  "version": "7aa57e33635247917fa6b2e375fe2581eed428283e4509a39a00c201a0b46819"
+  "target_session_date": "2026-11-18",
+  "version": "ec0d2a19d66b51b6e4f0641d0b21ade10d9a7218152619fcfe67ed26d908bfc9"
 }

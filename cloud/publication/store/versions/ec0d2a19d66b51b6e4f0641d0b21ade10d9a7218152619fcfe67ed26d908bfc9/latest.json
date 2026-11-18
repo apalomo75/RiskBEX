@@ -1,48 +1,48 @@
 {
   "additional_indicators": {
-    "var_95_60d": -0.016202485922811486
+    "var_95_60d": -0.016273062782864608
   },
   "engine": "MAIN",
   "execution_horizon": "next_market_session",
   "execution_rule": "Use this target during the next session; do not shift the signal again.",
   "features": {
     "cvar_95_60d": -0.020089735234987516,
-    "downside_vol_20d": 0.00675734946473874,
-    "downside_vol_60d": 0.006266066576884692,
-    "drawdown": -0.013208928897363026,
-    "ewma_vol": 0.010832428191335858,
-    "ret_1d": -0.0036780662049543346,
-    "ret_20d": 0.04655337814795523,
-    "ret_60d": -0.0075914582995084195,
-    "skew_60d": 0.09667894533229494,
-    "vol_20d": 0.011885261347715392,
-    "vol_60d": 0.00998800571836698
+    "downside_vol_20d": 0.006810327464756658,
+    "downside_vol_60d": 0.006361510803913113,
+    "drawdown": -0.029104110079045453,
+    "ewma_vol": 0.011230471910187586,
+    "ret_1d": -0.01623909317885464,
+    "ret_20d": 0.02752921941651406,
+    "ret_60d": -0.02173866718277634,
+    "skew_60d": 0.09354127820629181,
+    "vol_20d": 0.012587271809818822,
+    "vol_60d": 0.010199926674778224
   },
   "freshness": {
     "calendar_id": "bme-2026-reviewed-v1",
-    "checked_at": "2026-11-16T19:15:03.113219+00:00",
-    "expected_data_date": "2026-11-16",
+    "checked_at": "2026-11-18T15:07:10.564309+00:00",
+    "expected_data_date": "2026-11-17",
     "status": "current_at_generation"
   },
-  "generated_at": "2026-11-16T19:15:03.113219+00:00",
+  "generated_at": "2026-11-18T15:07:10.564309+00:00",
   "information_available_after": "close_of_information_session",
-  "last_valid_session": "2026-11-16",
+  "last_valid_session": "2026-11-17",
   "market": {
-    "ibex_close": 19946.599609375,
-    "ret_1d": -0.0036780662049543346
+    "ibex_close": 19625.30078125,
+    "ret_1d": -0.01623909317885464
   },
   "markov": {
     "economic_label": "medium_risk",
     "horizon": "current_session_filtered_state",
     "parameter_id": "1884f3ed40c6aaae9a79022487659e045905b4802b507a6f8c3ce88d19e2e7d3",
     "probabilities": {
-      "0": 0.4069875090829946,
-      "1": 0.0065257040950849315,
-      "2": 0.5864867868219203
+      "0": 0.1439297342174893,
+      "1": 0.014480957362373165,
+      "2": 0.8415893084201375
     },
     "regime": 2,
     "risk_order": 2,
-    "state_date": "2026-11-16"
+    "state_date": "2026-11-17"
   },
   "package_id": "riskbex-main-v1",
   "provenance": {
@@ -72,13 +72,13 @@
       "ml/inference.py": "9a2764a0e52c080589193f2a95f1009263e90f55f891da935de8c78ff947120a",
       "regimes/persistence.py": "00ce10de778f58d7bd2e41d9432ece824f0bedc9d2d2f36b63e04dab634049c3"
     },
-    "last_price_session": "2026-11-16",
+    "last_price_session": "2026-11-17",
     "live_market_freshness_verified": true,
     "manifest_sha256": "1e63e51d70278a60188db1351f5f5e081f8cfa011d82ce0012317ac4f676a68c",
     "models_retrained": false,
-    "operational_version": "7aa57e33635247917fa6b2e375fe2581eed428283e4509a39a00c201a0b46819",
-    "price_prefix_sha256": "5c4c74d4cb9f32443b4fe8cebf29b89305ed79117319ece54e9fbea1a8a15c22",
-    "price_rows_including_initialization": 6837,
+    "operational_version": "ec0d2a19d66b51b6e4f0641d0b21ade10d9a7218152619fcfe67ed26d908bfc9",
+    "price_prefix_sha256": "30f2f57c4ecf39b365c6fe8a462c5100ece105942262f10057f3b315d5b8e34b",
+    "price_rows_including_initialization": 6838,
     "regime_reference_sha256": "7b23766dc9a6f8d440d2523dc8e5e61d069b866b1e8403a0a44d2c064d15b1db",
     "required_versions": {
       "numpy": "2.3.4",
@@ -94,22 +94,22 @@
   },
   "requested_as_of": null,
   "schema_version": 1,
-  "signal_information_date": "2026-11-16",
+  "signal_information_date": "2026-11-17",
   "target_exposures": {
     "ml_hard": 0.5905564268560006,
-    "ml_probability_weighted": 0.7796042115409324,
+    "ml_probability_weighted": 0.6317138805804693,
     "regime_based": 0.5905564268560006
   },
-  "target_session_date": "2026-11-17",
+  "target_session_date": "2026-11-18",
   "xgboost": {
     "economic_label": "medium_risk",
     "horizon": "next_market_session",
-    "information_date": "2026-11-16",
+    "information_date": "2026-11-17",
     "model_id": "4368859c76af72ba48dd74158251faf0011e6a81c2162f73e94c21d98343469e",
     "probabilities": {
-      "0": 0.46203717589378357,
-      "1": 0.0005548862973228097,
-      "2": 0.5374079942703247
+      "0": 0.10091415792703629,
+      "1": 0.000685959355905652,
+      "2": 0.8983998894691467
     },
     "regime_pred": 2,
     "risk_order": 2
