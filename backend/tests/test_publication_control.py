@@ -236,11 +236,14 @@ class CalendarAndWorkflowTests(unittest.TestCase):
 
     def test_public_workflow_validates_offline_with_one_publication_switch(self):
         workflow = (ROOT / '.github/workflows/cloud-publication.yml').read_text()
-        self.assertNotIn('\n  schedule:', workflow)
+        self.assertIn(
+            "\n  schedule:\n    - cron: '17 20 * * 1-5'\n    - cron: '17 22 * * 1-5'\npermissions:",
+            workflow,
+        )
         for item in ['workflow_dispatch:', "vars.RISKBEX_PUBLICATION_ENABLED == 'true'",
                      'contents: write', 'contents: read',
                      'riskbex-protected-publication-v2', 'run_public_daily.py',
-                     'persist-credentials: false', '17 20 * * 1-5', '17 22 * * 1-5',
+                     'persist-credentials: false',
                      'RELEASE=$(git rev-parse HEAD)', '--head "$RELEASE"']:
             self.assertIn(item, workflow)
         job_guard = workflow.split('  daily:\n', 1)[1].split('    permissions:', 1)[0]
