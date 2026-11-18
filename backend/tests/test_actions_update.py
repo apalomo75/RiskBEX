@@ -11,6 +11,7 @@ from unittest.mock import patch
 import pandas as pd
 
 from scripts.run_daily_update import FileProvider
+from tests.publication_fixtures import ApprovedPublication
 from src.riskbex.actions_update import approved_bundle, bootstrap, candidate, promote, BRANCH
 from src.riskbex.cloud_snapshot import export_bundle, verify_bundle
 from src.riskbex.pipeline.calendar import SessionCalendar
@@ -44,12 +45,16 @@ class RunnerTests(unittest.TestCase):
         self.work = self.base / 'work'
 
     def test_fresh_checkout_and_no_network_noop(self):
+        publication = ApprovedPublication(self.root)
         with patch.object(FileProvider, 'fetch', side_effect=AssertionError('no network')):
-            result = candidate(self.root, self.work, now='2026-11-16T22:00Z', provider=FileProvider('unused'))
+            result = candidate(self.root, self.work, now=publication.clock(publication.session),
+                               provider=FileProvider('unused'))
         self.assertEqual(result['status'], 'unchanged')
         self.assertFalse((self.work / 'candidate').exists())
         self.assertFalse((self.root / 'backend/runtime').exists())
-        self.assertEqual(approved_bundle(self.root)['version'], result['version'])
+        self.assertEqual(result['version'], publication.approval['version'])
+        self.assertEqual(result['data_date'], publication.approval['data_date'])
+        self.assertEqual(approved_bundle(self.root), publication.approval)
 
     def test_missing_and_corrupt_bootstrap_inputs(self):
         for name in ['backend/model_packages/main-v1/xgboost/model.ubj',
@@ -102,6 +107,7 @@ class RunnerTests(unittest.TestCase):
         package, receipt = bootstrap(self.root, self.base / 'restore')
         assets = self.base / 'restore/assets'
         prices = pd.read_csv(self.base / 'restore/seed.csv', float_precision='round_trip')
+        prices = prices.loc[prices.date <= '2026-11-16']
         provider_path = self.base / 'provider.csv'; prices.to_csv(provider_path, index=False)
         # Two missing sessions; previous closed session is Thursday 12 November.
         seed = prices.loc[prices.date <= '2026-11-12']
@@ -128,12 +134,12 @@ class RunnerTests(unittest.TestCase):
         self.assertEqual(approved_bundle(self.root), old)
         inv = verify_bundle(self.work / 'candidate', digest(self.work / 'candidate/snapshot.json'))
         self.assertNotEqual(inv['version'], old['version'])
-        # Prices, probabilities and exposures agree with the original live publication.
-        original = VersionStore(self.clean / 'cloud/publication/store').current()
+        # Compare every output table with the original approved November 16 replay baseline.
+        baseline = json.loads((ROOT / 'backend/tests/fixtures/november-16-replay.json').read_text())
         replay = VersionStore(self.work / 'candidate/store').current()
-        for name in ['prices', 'features', 'signals', 'backtest', 'metrics', 'turnover']:
-            pd.testing.assert_frame_equal(pd.read_csv(original / (name + '.csv')),
-                                          pd.read_csv(replay / (name + '.csv')))
+        for name, expected in baseline['tables'].items():
+            with self.subTest(table=name):
+                self.assertEqual(digest(replay / name), expected)
         head = 'a' * 40
         # Every Git command is simulated, including setup and local commits.
         calls = []

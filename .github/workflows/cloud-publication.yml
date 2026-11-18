@@ -6,10 +6,9 @@ on:
         description: 'Retrieve market data and publish after offline acceptance'
         type: boolean
         default: false
-# Activation diff, only after acceptance (UTC, after 20:00 Madrid in CET and CEST):
-#  schedule:
-#    - cron: '17 20 * * 1-5'
-#    - cron: '17 22 * * 1-5'
+  schedule:
+    - cron: '17 20 * * 1-5'
+    - cron: '17 22 * * 1-5'
 permissions:
   contents: read
 concurrency:

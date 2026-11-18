@@ -1,4 +1,5 @@
 """Cloud approval discovery, strict pins and visitor cache invalidation offline."""
+from datetime import date, timedelta
 import json
 import os
 from pathlib import Path
@@ -7,7 +8,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 import shutil
-from src.riskbex.cloud_snapshot import verify_bundle
+from src.riskbex.actions_update import approved_bundle
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -22,6 +23,7 @@ class CloudApprovalTests(unittest.TestCase):
         self.root = Path(self.temp.name)
         shutil.copytree(ROOT / 'cloud/publication', self.root / 'cloud/publication')
         shutil.copyfile(ROOT / 'cloud/approval.json', self.root / 'cloud/approval.json')
+        self.approval = approved_bundle(self.root)
         self.st = SimpleNamespace(secrets={'RISKBEX_SNAPSHOT_SHA256': 'obsolete-manual-secret'},
                                   session_state={'_riskbex_snapshot_version': 'previous'},
                                   cache_data=SimpleNamespace(clear=Mock()), error=Mock(),
@@ -38,8 +40,7 @@ class CloudApprovalTests(unittest.TestCase):
 
     def test_git_approval_supersedes_stale_secret_and_invalidates_cache(self):
         self.run_entry()
-        version = json.loads((self.root / 'cloud/approval.json').read_text())['version']
-        self.assertEqual(self.st.session_state['_riskbex_snapshot_version'], version)
+        self.assertEqual(self.st.session_state['_riskbex_snapshot_version'], self.approval['version'])
         self.st.cache_data.clear.assert_called_once()
         self.run_entry()
         self.st.cache_data.clear.assert_called_once()
@@ -50,19 +51,19 @@ class CloudApprovalTests(unittest.TestCase):
 
     def test_legacy_secret_exported_to_environment_is_not_a_permanent_pin(self):
         self.run_entry({'RISKBEX_SNAPSHOT_SHA256': 'obsolete-manual-secret'})
-        self.assertEqual(self.st.session_state['_riskbex_snapshot_data_date'], '2026-11-16')
+        self.assertEqual(self.st.session_state['_riskbex_snapshot_data_date'], self.approval['data_date'])
 
     def test_current_deployed_secret_remains_compatible(self):
-        approval = json.loads((self.root / 'cloud/approval.json').read_text())
-        seal = approval['snapshot_sha256']
+        seal = self.approval['snapshot_sha256']
         self.st.secrets['RISKBEX_SNAPSHOT_SHA256'] = seal
         self.run_entry({'RISKBEX_SNAPSHOT_SHA256': seal})
 
     def test_malformed_or_inconsistent_approval_rejected_even_with_valid_pin(self):
         path = self.root / 'cloud/approval.json'
-        original = json.loads(path.read_text())
+        original = self.approval
+        earlier = date.fromisoformat(original['data_date']) - timedelta(days=1)
         invalid = [[], dict(original, format=True), dict(original, version='0' * 64),
-                   dict(original, data_date='2026-11-13'), dict(original, data_date='invalid')]
+                   dict(original, data_date=earlier.isoformat()), dict(original, data_date='invalid')]
         for value in invalid:
             with self.subTest(value=value):
                 path.write_text(json.dumps(value))
@@ -70,7 +71,8 @@ class CloudApprovalTests(unittest.TestCase):
                     self.run_entry({'RISKBEX_SNAPSHOT_SHA256': original['snapshot_sha256']})
 
     def test_session_date_regression_rejected(self):
-        self.st.session_state['_riskbex_snapshot_data_date'] = '2026-11-17'
+        later = date.fromisoformat(self.approval['data_date']) + timedelta(days=1)
+        self.st.session_state['_riskbex_snapshot_data_date'] = later.isoformat()
         with self.assertRaises(Stopped):
             self.run_entry()
 
@@ -88,10 +90,9 @@ class CloudApprovalTests(unittest.TestCase):
         with self.assertRaises(Stopped): self.run_entry()
 
     def test_absent_default_approval_rejected_even_with_valid_pin(self):
-        approval = json.loads((self.root / 'cloud/approval.json').read_text())
         (self.root / 'cloud/approval.json').unlink()
         with self.assertRaises(Stopped): self.run_entry()
-        with self.assertRaises(Stopped): self.run_entry({'RISKBEX_SNAPSHOT_SHA256': approval['snapshot_sha256']})
+        with self.assertRaises(Stopped): self.run_entry({'RISKBEX_SNAPSHOT_SHA256': self.approval['snapshot_sha256']})
         self.st.secrets = {}
         with self.assertRaises(Stopped): self.run_entry()
 

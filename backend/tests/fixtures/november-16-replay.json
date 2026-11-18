@@ -1,0 +1,12 @@
+{
+  "source_commit": "a43e8944dc95f925d31bef878679e8edab17ed8a",
+  "data_date": "2026-11-16",
+  "tables": {
+    "backtest.csv": "220b926dd3cc1e5994db14f3010c44c0805f366e8490a1a74a4ed346aa51582e",
+    "features.csv": "04d220a257782d786f74e1a20395158ef01c5ba3c91afb6e59f17971ee798f3f",
+    "metrics.csv": "b22dc7f55eb41b3cd6b8359ee1b8850ffe190faa3b5c3e28030fd40894ab3db3",
+    "prices.csv": "5e9ead00a93d7163edb2f4e6f9ed87c59bc5eb0623bb3b3dae55bab0bc65ec2c",
+    "signals.csv": "8297c9bc10aa819a028c5022048fbb9658e7ec06a1cd265e8bb8a80055441baf",
+    "turnover.csv": "57468423ebbabf8c48f528b632710357a6adb74872c778a9693c2ea1015b0b42"
+  }
+}

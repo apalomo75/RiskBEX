@@ -14,6 +14,7 @@ import pandas as pd
 
 from scripts.run_actions_live_dry_run import run
 from scripts.run_daily_update import FileProvider
+from tests.publication_fixtures import ApprovedPublication
 from src.riskbex.actions_update import promote, approved_bundle, BRANCH
 from src.riskbex.publication_control import verify_provenance
 from src.riskbex.pipeline.store import VersionStore, write_json, digest
@@ -22,14 +23,19 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class SummaryTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.publication = ApprovedPublication(ROOT)
+        cls.next_session = cls.publication.calendar.next_session(cls.publication.session)
+
     def test_noop_before_cutoff_has_zero_sessions_and_no_fetch(self):
         with tempfile.TemporaryDirectory() as temp:
             summary = {}
             with patch.object(FileProvider, 'fetch', side_effect=AssertionError('No network')):
                 run(ROOT, Path(temp) / 'work', provider=FileProvider('unused'),
-                    now='2026-11-17T13:27:19Z', public_summary=summary)
-            self.assertEqual(summary['previous_approved_session'], '2026-11-16')
-            self.assertEqual(summary['latest_validated_candidate_session'], '2026-11-16')
+                    now=self.publication.clock(self.next_session, before_cutoff=True), public_summary=summary)
+            self.assertEqual(summary['previous_approved_session'], self.publication.approval['data_date'])
+            self.assertEqual(summary['latest_validated_candidate_session'], self.publication.approval['data_date'])
             self.assertEqual(summary['new_trading_sessions'], 0)
             self.assertEqual(summary['update'], 'skipped')
             self.assertEqual(summary['run_status'], 'success')
@@ -43,7 +49,7 @@ class SummaryTests(unittest.TestCase):
             with patch('scripts.run_actions_live_dry_run.snapshot_identity', side_effect=[{}, OSError('PRIVATE')]):
                 with self.assertRaisesRegex(AssertionError, 'unreadable'):
                     run(ROOT, Path(temp) / 'work', provider=None,
-                        now='2026-11-17T13:27:19Z', public_summary=summary)
+                        now=self.publication.clock(self.next_session, before_cutoff=True), public_summary=summary)
             self.assertEqual(summary['run_status'], 'failed')
             self.assertEqual(summary['integrity_gate'], 'failed')
             self.assertIsNone(summary['new_trading_sessions'])
@@ -54,7 +60,7 @@ class SummaryTests(unittest.TestCase):
             with patch.object(FileProvider, 'fetch', side_effect=RuntimeError('PRIVATE_PRICE')):
                 with self.assertRaises(RuntimeError):
                     run(ROOT, Path(temp) / 'work', provider=FileProvider('unused'),
-                        now='2026-11-17T22:00Z', public_summary=summary)
+                        now=self.publication.clock(self.next_session), public_summary=summary)
             self.assertEqual(summary['run_status'], 'failed')
             self.assertEqual(summary['update'], 'failed')
             self.assertIsNone(summary['new_trading_sessions'])
@@ -68,7 +74,7 @@ class SummaryTests(unittest.TestCase):
                  patch('scripts.run_actions_live_dry_run.verify_approved_bundle', side_effect=ValueError('PRIVATE')):
                 with self.assertRaises(ValueError):
                     run(ROOT, Path(temp) / 'work', provider=None,
-                        now='2026-11-17T22:00Z', public_summary=summary)
+                        now=self.publication.clock(self.next_session), public_summary=summary)
             self.assertEqual(summary['integrity_gate'], 'failed')
             self.assertEqual(summary['run_status'], 'failed')
             self.assertIsNone(summary['latest_validated_candidate_session'])
@@ -78,7 +84,7 @@ class SummaryTests(unittest.TestCase):
             summary = {}
             with patch('scripts.run_actions_live_dry_run.verify_gate', side_effect=ValueError('PRIVATE')):
                 with self.assertRaises(ValueError):
-                    run(ROOT, Path(temp) / 'work', provider=None, now='2026-11-17T22:00Z', public_summary=summary)
+                    run(ROOT, Path(temp) / 'work', provider=None, now=self.publication.clock(self.next_session), public_summary=summary)
             self.assertEqual(summary['regression_gate'], 'failed')
             self.assertEqual(summary['run_status'], 'failed')
 
@@ -89,20 +95,21 @@ class TransactionTests(unittest.TestCase):
         cls.temp = tempfile.TemporaryDirectory()
         cls.addClassCleanup(cls.temp.cleanup)
         cls.base = Path(cls.temp.name)
-        current = VersionStore(ROOT / 'cloud/publication/store').current()
-        history = pd.read_csv(current / 'prices.csv', float_precision='round_trip')
-        extension = pd.read_csv(ROOT / 'backend/tests/fixtures/live-dry-run/extension.csv')
+        cls.publication = ApprovedPublication(ROOT)
+        cls.next_session = cls.publication.calendar.next_session(cls.publication.session)
+        history = cls.publication.history()
+        extension = cls.publication.extension(history, [cls.next_session])
         provider = cls.base / 'provider.csv'
         pd.concat([history, extension]).to_csv(provider, index=False)
         cls.work = cls.base / 'work'
         cls.summary = {}
         with patch('yfinance.download', side_effect=AssertionError('Network forbidden')):
-            run(ROOT, cls.work, provider=FileProvider(provider), now='2026-11-17T22:00Z',
+            run(ROOT, cls.work, provider=FileProvider(provider), now=cls.publication.clock(cls.next_session),
                 public_summary=cls.summary)
 
     def test_generated_summary_has_only_allowlisted_metadata(self):
         self.assertEqual(self.summary['new_trading_sessions'], 1)
-        self.assertEqual(self.summary['latest_validated_candidate_session'], '2026-11-17')
+        self.assertEqual(self.summary['latest_validated_candidate_session'], self.next_session.date().isoformat())
         self.assertEqual(self.summary['update'], 'generated')
         self.assertEqual(set(self.summary), {'format', 'previous_approved_session',
             'latest_validated_candidate_session', 'new_trading_sessions', 'update', 'integrity_gate',
@@ -110,7 +117,7 @@ class TransactionTests(unittest.TestCase):
 
     def test_offline_candidate_cannot_claim_live_provenance(self):
         with self.assertRaisesRegex(ValueError, 'Live candidate'):
-            verify_provenance(ROOT, self.work, approved_bundle(ROOT), require_live=True)
+            verify_provenance(ROOT, self.work, self.publication.approval, require_live=True)
 
     def test_protected_approval_delay_cannot_publish_stale_candidate(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -127,9 +134,11 @@ class TransactionTests(unittest.TestCase):
             manifest['files']['latest.json'] = digest(latest_path)
             write_json(manifest_path, manifest)
             write_json(store / 'current.json', dict(version=current.name, manifest_sha256=digest(manifest_path)))
-            verify_provenance(ROOT, work, approved_bundle(ROOT), require_live=True, now='2026-11-17T22:00Z')
+            verify_provenance(ROOT, work, self.publication.approval, require_live=True, now=self.publication.clock(self.next_session))
+            later = self.publication.calendar.next_session(self.next_session)
             with self.assertRaisesRegex(ValueError, 'became stale'):
-                verify_provenance(ROOT, work, approved_bundle(ROOT), require_live=True, now='2026-11-18T22:00Z')
+                verify_provenance(ROOT, work, self.publication.approval, require_live=True,
+                                  now=self.publication.clock(later))
 
     def test_normal_push_rejection_and_concurrent_commit_preserve_remote(self):
         # Simulate transport: the guarded gate never creates commits or pushes.
@@ -141,7 +150,7 @@ class TransactionTests(unittest.TestCase):
                 shutil.copyfile(ROOT / 'cloud/approval.json', root / 'cloud/approval.json')
                 head = 'a' * 40
                 remote = {'head': 'b' * 40 if mode == 'concurrent' else head,
-                          'approval': approved_bundle(ROOT)}
+                          'approval': self.publication.approval}
                 previous = dict(remote)
                 calls = []
                 def transport(command, **kwargs):
@@ -159,7 +168,7 @@ class TransactionTests(unittest.TestCase):
                 with patch('subprocess.check_output', side_effect=transport):
                     if mode == 'success':
                         self.assertEqual(promote(root, self.work, head), 'published')
-                        self.assertEqual(remote['approval']['data_date'], '2026-11-17')
+                        self.assertEqual(remote['approval']['data_date'], self.next_session.date().isoformat())
                     else:
                         with self.assertRaises(subprocess.CalledProcessError):
                             promote(root, self.work, head)
@@ -236,11 +245,14 @@ class CalendarAndWorkflowTests(unittest.TestCase):
 
     def test_public_workflow_validates_offline_with_one_publication_switch(self):
         workflow = (ROOT / '.github/workflows/cloud-publication.yml').read_text()
-        self.assertNotIn('\n  schedule:', workflow)
+        self.assertIn(
+            "\n  schedule:\n    - cron: '17 20 * * 1-5'\n    - cron: '17 22 * * 1-5'\npermissions:",
+            workflow,
+        )
         for item in ['workflow_dispatch:', "vars.RISKBEX_PUBLICATION_ENABLED == 'true'",
                      'contents: write', 'contents: read',
                      'riskbex-protected-publication-v2', 'run_public_daily.py',
-                     'persist-credentials: false', '17 20 * * 1-5', '17 22 * * 1-5',
+                     'persist-credentials: false',
                      'RELEASE=$(git rev-parse HEAD)', '--head "$RELEASE"']:
             self.assertIn(item, workflow)
         job_guard = workflow.split('  daily:\n', 1)[1].split('    permissions:', 1)[0]

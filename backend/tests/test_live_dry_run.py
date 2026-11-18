@@ -11,8 +11,8 @@ from unittest.mock import patch
 import pandas as pd
 from scripts.run_actions_live_dry_run import run, main, dry_run_guards
 from scripts.run_daily_update import FileProvider
+from tests.publication_fixtures import ApprovedPublication
 from src.riskbex.actions_update import approved_bundle
-from src.riskbex.pipeline.store import VersionStore
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -51,16 +51,17 @@ class LiveDryRunTests(unittest.TestCase):
     def test_synthetic_candidate_and_private_report(self):
         with tempfile.TemporaryDirectory() as directory:
             base = Path(directory)
-            before = approved_bundle(ROOT)
-            current = VersionStore(ROOT / 'cloud/publication/store').current()
-            history = pd.read_csv(current / 'prices.csv', float_precision='round_trip')
-            extension = pd.read_csv(ROOT / 'backend/tests/fixtures/live-dry-run/extension.csv')
+            publication = ApprovedPublication(ROOT)
+            before = publication.approval
+            session = publication.calendar.next_session(publication.session)
+            history = publication.history()
+            extension = publication.extension(history, [session])
             provider_file = base / 'provider.csv'
             pd.concat([history, extension]).to_csv(provider_file, index=False)
             with patch('yfinance.download', side_effect=AssertionError('Network forbidden')):
-                report = run(ROOT, base / 'work', provider=FileProvider(provider_file), now='2026-11-17T22:00Z')
+                report = run(ROOT, base / 'work', provider=FileProvider(provider_file), now=publication.clock(session))
             self.assertEqual(report['mode'], 'offline_fixture')
-            self.assertEqual(report['new']['data_date'], '2026-11-17')
+            self.assertEqual(report['new']['data_date'], session.date().isoformat())
             self.assertEqual(report['new_outputs']['manifest']['previous_version'], before['version'])
             self.assertEqual(report['new_outputs']['tables']['prices']['rows'], len(history) + 1)
             self.assertEqual(report['snapshot_file_sha256'], report['new']['snapshot_sha256'])
