@@ -26,32 +26,17 @@ A confirmation failure after a successful push can mean publication succeeded:
 inspect the remote approval before retrying. Streamlit refresh is asynchronous;
 remote-head confirmation establishes Git publication, not successful app startup.
 
-## Rights and remaining acceptance requirements
+## Production controls and remaining acceptance requirements
 
-The owner's confirmation is recorded in the task, but no underlying licence or
-permission evidence has been supplied in this checkout. The receipt remains
-`blocked`; no evidence file or verified-rights claim was created. This is a real
-publication blocker, independent of the disabled workflow switch.
+The owner confirmed authorization for retrieval, use and public redistribution.
+Provider restrictions continue to apply. The production controller requires no
+documentary receipt, evidence upload or periodic attestation.
 
-No daily human approval is required: `cloud/approval.json` is the atomic integrity
-record generated with the snapshot, not a manual review queue. The single
-`RISKBEX_PUBLICATION_ENABLED` switch authorizes both retrieval and publication;
-with it absent/false, manual dispatch still runs complete public offline acceptance
-without downloading or publishing. Retired private/custody tests remain available
-separately and are not prerequisites for public production.
-
-The gate accepts the existing `verified` receipt or `owner_authorized`. Both require
-provider `Yahoo Finance / IBEX 35`, all scopes in `publication_control.SCOPES`, an
-unexpired ISO `valid_until`, `reviewed_by`, `licence_reference`, and `evidence_sha256`
-matching `backend/config/publication-rights-evidence.txt`. Owner authorization also
-requires `authorized_by: apalomo75`, `repository: apalomo75/RiskBEX`, ISO
-`authorized_on` no later than today, and a nonempty `permission_basis` identifying
-the actual grant. Record a real reviewable permission reference/attestation and
-relevant evidence; do not place confidential agreements in public Git. A hash binds
-reviewed evidence bytes; it does not independently verify the legal grant. Review
-coverage of automated retrieval, raw history, returns, reconstructible charts,
-derived signals, research assets and public Git redistribution. Do not activate if
-any scope is missing. Never create placeholder evidence to satisfy the gate.
+The workflow generates `cloud/approval.json` together with the snapshot, so
+daily runs require no manual approval. Manual dispatch is validation-only by
+default. A live manual dispatch requires `publish=true` and the repository
+variable `RISKBEX_PUBLICATION_ENABLED=true`. Scheduled runs use the same
+repository variable.
 
 Calendar coverage is currently limited to 2026 and fails closed before retrieval
 when the eligible or next target session is outside coverage. A reviewed extension
@@ -62,7 +47,7 @@ refresh still need real acceptance; none was tested by dispatch during this task
 
 Review the complete worktree first: earlier Sprint 11 changes were already
 uncommitted when this task began. Stage only reviewed files; do not use `git add .`.
-Install the controller code, tests, retirement changes and receipt/evidence on
+Install the controller code, tests, and retirement changes on
 `main` through the normal review process. Keep the release runtime compatible with
 the controller's frozen lockfile, package, calendar and regression receipt. Deploy
 any required code/configuration through a separate reviewed release change while
@@ -89,13 +74,19 @@ Keep the publication switch disabled during installation.
 
 ## First publication and automatic execution (not executed here)
 
-After supplying and reviewing genuine evidence, installing reviewed code and
-passing offline acceptance, the following switch authorizes subsequent live
-downloads and publication. It defaults to disabled when absent; no remote settings were changed:
+After the controller change is reviewed and merged, dispatch hosted offline
+acceptance from `main` and confirm that it passes:
+
+```bash
+gh workflow run cloud-publication.yml --repo apalomo75/RiskBEX --ref main
+```
+
+After hosted acceptance and the market-data availability threshold, enable the
+repository variable and explicitly request the first live run:
 
 ```bash
 gh variable set RISKBEX_PUBLICATION_ENABLED --repo apalomo75/RiskBEX --body true
-gh workflow run cloud-publication.yml --repo apalomo75/RiskBEX --ref main
+gh workflow run cloud-publication.yml --repo apalomo75/RiskBEX --ref main -f publish=true
 gh run list --repo apalomo75/RiskBEX --workflow cloud-publication.yml --limit 5
 ```
 
@@ -114,10 +105,9 @@ for line in ["  schedule:", "    - cron: '17 20 * * 1-5'", "    - cron: '17 22 *
 p.write_text(s)
 PYTHON
 git diff -- .github/workflows/cloud-publication.yml
-test "$(git branch --show-current)" = main
 git add -- .github/workflows/cloud-publication.yml
 git commit -m "Activate reviewed daily MAIN production schedule"
-git push origin HEAD:refs/heads/main
+# Push a topic branch and open a pull request targeting main.
 ```
 
 Primary `17 20 * * 1-5` and recovery `17 22 * * 1-5` are
@@ -193,6 +183,5 @@ payload or approval is included in either change. Install and review release
 compatibility before the controller. Diagnostic/recovery/live trial workflows are
 archived outside workflows; daily-update.yml remains a read-only manual regression
 workflow. cloud-publication.yml is the sole production publisher, still gated and
-without a schedule. Rights evidence, hosted permissions and first-run/Cloud
-acceptance remain pending. Historical sprint activation instructions are records,
-not authorization to activate them.
+without a schedule at the time of installation. Hosted acceptance and the
+first live run are tracked by the current commissioning steps above.
