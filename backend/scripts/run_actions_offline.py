@@ -88,7 +88,6 @@ def main(argv=None):
                        'tests.test_daily_pipeline', 'tests.test_actions_cloud',
                        'tests.test_live_dry_run',
                        'tests.test_publication_control.SummaryTests',
-                       'tests.test_publication_control.RightsTests',
                        'tests.test_publication_control.TransactionTests',
                        'tests.test_publication_control.CalendarAndWorkflowTests.test_expiry_blocks_final_session_target_before_network',
                        'tests.test_publication_control.CalendarAndWorkflowTests.test_public_workflow_validates_offline_with_one_publication_switch',

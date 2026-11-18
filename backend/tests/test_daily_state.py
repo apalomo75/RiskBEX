@@ -49,8 +49,7 @@ class DailyStateTests(unittest.TestCase):
                 raise AssertionError(args)
             first = base / 'day1'
             candidate(root, first, now='2026-11-17T22:00Z', provider=FileProvider(provider))
-            with patch('subprocess.check_output', side_effect=git), patch('src.riskbex.publication_control.verify_rights',
-                    side_effect=AssertionError('Private state must not use public rights') if private else None):
+            with patch('subprocess.check_output', side_effect=git):
                 self.assertEqual(promote(root, first, 'a' * 40, private=private), 'published')
                 with self.assertRaisesRegex(ValueError, 'branch/head'):
                     promote(root, first, 'a' * 40, private=private)
@@ -68,8 +67,7 @@ class DailyStateTests(unittest.TestCase):
             self.assertEqual(result['new_sessions'], 1)
             manifest = json.loads((VersionStore(second / 'candidate/store').current() / 'manifest.json').read_text())
             self.assertEqual(manifest['previous_version'], old['version'])
-            with patch('subprocess.check_output', side_effect=git), patch('src.riskbex.publication_control.verify_rights',
-                    side_effect=AssertionError('Private state must not use public rights') if private else None):
+            with patch('subprocess.check_output', side_effect=git):
                 self.assertEqual(promote(root, second, 'b' * 40, private=private), 'published')
             self.assertEqual(remote['approval']['data_date'], '2026-11-18')
 

@@ -98,8 +98,7 @@ class RunnerTests(unittest.TestCase):
             with self.subTest(now=now):
                 self.assertEqual(str(cal.eligible(now).date()), expected)
 
-    @patch('src.riskbex.publication_control.verify_rights')
-    def test_real_frozen_replay_and_git_promotion(self, rights_fixture):
+    def test_real_frozen_replay_and_git_promotion(self):
         package, receipt = bootstrap(self.root, self.base / 'restore')
         assets = self.base / 'restore/assets'
         prices = pd.read_csv(self.base / 'restore/seed.csv', float_precision='round_trip')
