@@ -12,7 +12,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   daily:
-    if: github.repository == 'apalomo75/RiskBEX' && github.ref == 'refs/heads/main' && vars.RISKBEX_PUBLICATION_ENABLED == 'true' && vars.RISKBEX_LIVE_DOWNLOAD_AUTHORIZED == 'true'
+    if: github.repository == 'apalomo75/RiskBEX' && github.ref == 'refs/heads/main'
     permissions:
       contents: write
     runs-on: ubuntu-24.04
@@ -23,7 +23,6 @@ jobs:
       OPENBLAS_NUM_THREADS: '1'
       MKL_NUM_THREADS: '1'
       RISKBEX_PUBLICATION_ENABLED: ${{ vars.RISKBEX_PUBLICATION_ENABLED }}
-      RISKBEX_LIVE_DOWNLOAD_AUTHORIZED: ${{ vars.RISKBEX_LIVE_DOWNLOAD_AUTHORIZED }}
     defaults:
       run:
         shell: bash --noprofile --norc -euo pipefail {0}
@@ -63,6 +62,7 @@ jobs:
           rm -rf -- "$VALIDATION"
           git -C publication-source worktree prune
       - name: Retrieve, validate and publish atomically
+        if: vars.RISKBEX_PUBLICATION_ENABLED == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -78,6 +78,10 @@ jobs:
           export GIT_ASKPASS="$ASKPASS" GIT_TERMINAL_PROMPT=0
           python backend/scripts/run_public_daily.py --root publication-source --work "$RUNNER_TEMP/public-daily" --head "$RELEASE" | tee "$RUNNER_TEMP/daily-summary.json"
           cat "$RUNNER_TEMP/daily-summary.json" >> "$GITHUB_STEP_SUMMARY"
+      - name: Report validation-only execution
+        if: vars.RISKBEX_PUBLICATION_ENABLED != 'true'
+        run: |
+          echo 'Offline acceptance passed. Live retrieval and public publication are disabled; public redistribution rights remain a separate mandatory gate.' >> "$GITHUB_STEP_SUMMARY"
       - name: Cleanup
         if: always()
         run: |

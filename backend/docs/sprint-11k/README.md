@@ -31,7 +31,14 @@ remote-head confirmation establishes Git publication, not successful app startup
 The owner's confirmation is recorded in the task, but no underlying licence or
 permission evidence has been supplied in this checkout. The receipt remains
 `blocked`; no evidence file or verified-rights claim was created. This is a real
-publication blocker, independent of the disabled workflow switches.
+publication blocker, independent of the disabled workflow switch.
+
+No daily human approval is required: `cloud/approval.json` is the atomic integrity
+record generated with the snapshot, not a manual review queue. The single
+`RISKBEX_PUBLICATION_ENABLED` switch authorizes both retrieval and publication;
+with it absent/false, manual dispatch still runs complete public offline acceptance
+without downloading or publishing. Retired private/custody tests remain available
+separately and are not prerequisites for public production.
 
 The gate accepts the existing `verified` receipt or `owner_authorized`. Both require
 provider `Yahoo Finance / IBEX 35`, all scopes in `publication_control.SCOPES`, an
@@ -77,17 +84,16 @@ main's `backend/scripts`, `backend/src`, `backend/tests`, `backend/config` and
 `backend/requirements-docker.lock`; invoke `run_actions_offline.py` with the full
 release base SHA. Require zero failures and zero skips. Do not run this gate in the
 bare main tree, or alter the clean publication checkout to make acceptance pass.
-Keep publication and live-download switches disabled during installation.
+Keep the publication switch disabled during installation.
 
 
 ## First publication and automatic execution (not executed here)
 
 After supplying and reviewing genuine evidence, installing reviewed code and
-passing offline acceptance, the following switches authorize subsequent live
-downloads and publication. They default to disabled when absent; no remote settings were changed:
+passing offline acceptance, the following switch authorizes subsequent live
+downloads and publication. It defaults to disabled when absent; no remote settings were changed:
 
 ```bash
-gh variable set RISKBEX_LIVE_DOWNLOAD_AUTHORIZED --repo apalomo75/RiskBEX --body true
 gh variable set RISKBEX_PUBLICATION_ENABLED --repo apalomo75/RiskBEX --body true
 gh workflow run cloud-publication.yml --repo apalomo75/RiskBEX --ref main
 gh run list --repo apalomo75/RiskBEX --workflow cloud-publication.yml --limit 5
@@ -127,7 +133,6 @@ To stop new publication/downloads:
 
 ```bash
 gh variable set RISKBEX_PUBLICATION_ENABLED --repo apalomo75/RiskBEX --body false
-gh variable set RISKBEX_LIVE_DOWNLOAD_AUTHORIZED --repo apalomo75/RiskBEX --body false
 ```
 
 Inspect any already running job separately; variable changes do not cancel it.
@@ -177,7 +182,7 @@ test, only the two affected consecutive-day tests were rerun: **2 passed in
 The reviewed installation separates controller and release changes. Main has no
 approved publication payload: its production workflow creates a disposable Git
 worktree from the resolved clean release, overlays the controller scripts, source,
-tests, configuration and workflow fixtures, and runs all 78 offline checks there.
+tests, configuration and workflow fixtures, and runs the complete applicable public offline acceptance there.
 The publication checkout remains untouched. This supersedes the direct main-root
 acceptance command above, which cannot work without an approved snapshot.
 

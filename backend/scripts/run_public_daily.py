@@ -1,4 +1,4 @@
-"""Single public-repository daily path; explicit switches required before retrieval."""
+"""Single public-repository daily path; one activation switch plus distribution rights required before retrieval."""
 import argparse
 from contextlib import redirect_stdout, redirect_stderr
 import io
@@ -20,8 +20,7 @@ from src.riskbex.publication_control import verify_rights
 def execute(root, work, head, *, now, provider=None):
     if (os.getenv('GITHUB_REPOSITORY') != 'apalomo75/RiskBEX'
             or os.getenv('GITHUB_REF') != 'refs/heads/main'
-            or any(os.getenv(key) != 'true' for key in
-                   ['RISKBEX_PUBLICATION_ENABLED', 'RISKBEX_LIVE_DOWNLOAD_AUTHORIZED'])):
+            or os.getenv('RISKBEX_PUBLICATION_ENABLED') != 'true'):
         raise ValueError('Public daily activation is disabled.')
     verify_predecessor(root, head)
     verify_rights(root)
