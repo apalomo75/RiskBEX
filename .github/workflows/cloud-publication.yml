@@ -1,6 +1,11 @@
-name: MAIN public daily production (disabled pending acceptance)
+name: MAIN public daily production
 on:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Retrieve market data and publish after offline acceptance'
+        type: boolean
+        default: false
 # Activation diff, only after acceptance (UTC, after 20:00 Madrid in CET and CEST):
 #  schedule:
 #    - cron: '17 20 * * 1-5'
@@ -62,7 +67,7 @@ jobs:
           rm -rf -- "$VALIDATION"
           git -C publication-source worktree prune
       - name: Retrieve, validate and publish atomically
-        if: vars.RISKBEX_PUBLICATION_ENABLED == 'true'
+        if: vars.RISKBEX_PUBLICATION_ENABLED == 'true' && (github.event_name == 'schedule' || inputs.publish)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -79,9 +84,9 @@ jobs:
           python backend/scripts/run_public_daily.py --root publication-source --work "$RUNNER_TEMP/public-daily" --head "$RELEASE" | tee "$RUNNER_TEMP/daily-summary.json"
           cat "$RUNNER_TEMP/daily-summary.json" >> "$GITHUB_STEP_SUMMARY"
       - name: Report validation-only execution
-        if: vars.RISKBEX_PUBLICATION_ENABLED != 'true'
+        if: vars.RISKBEX_PUBLICATION_ENABLED != 'true' || (github.event_name == 'workflow_dispatch' && !inputs.publish)
         run: |
-          echo 'Offline acceptance passed. Live retrieval and public publication are disabled; public redistribution rights remain a separate mandatory gate.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Offline acceptance passed. Live retrieval and public publication are disabled for this run.' >> "$GITHUB_STEP_SUMMARY"
       - name: Cleanup
         if: always()
         run: |

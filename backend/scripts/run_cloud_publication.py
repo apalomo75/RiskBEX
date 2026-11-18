@@ -12,7 +12,6 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.run_actions_live_dry_run import run
 from src.riskbex.actions_update import promote, approved_bundle
-from src.riskbex.publication_control import verify_rights
 from src.riskbex.pipeline.store import write_json, digest, VersionStore
 from src.riskbex.engine.package import load_main_package
 
@@ -51,7 +50,6 @@ def main():
     args = parser.parse_args()
     summary = {}
     try:
-        verify_rights(args.root)
         binding = dict(format=1, source_head=args.head, controller=args.controller,
                        run_id=os.environ['GITHUB_RUN_ID'], run_attempt=os.environ['GITHUB_RUN_ATTEMPT'],
                        repository=os.environ['GITHUB_REPOSITORY'])

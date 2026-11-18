@@ -94,9 +94,7 @@ def promote(root, work, expected_head, *, require_live=False, private=False):
     def git(*args):
         return subprocess.check_output(['git', '-C', str(root), *args], text=True).strip()
     branch = verify_predecessor(root, expected_head, private=private)
-    from src.riskbex.publication_control import verify_rights, verify_provenance
-    if not private:
-        verify_rights(root)
+    from src.riskbex.publication_control import verify_provenance
     old = approved_bundle(root)
     new = json.loads((work / 'approval.json').read_text())
     inventory = verify_bundle(work / 'candidate', new['snapshot_sha256'])

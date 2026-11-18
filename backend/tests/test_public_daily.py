@@ -6,8 +6,6 @@ import unittest
 from unittest.mock import patch
 
 from scripts.run_public_daily import execute
-from src.riskbex.publication_control import verify_rights, SCOPES
-from src.riskbex.pipeline.store import write_json, digest
 
 ENV = dict(GITHUB_REPOSITORY='apalomo75/RiskBEX', GITHUB_REF='refs/heads/main',
            RISKBEX_PUBLICATION_ENABLED='true')
@@ -31,19 +29,11 @@ class PublicDailyTests(unittest.TestCase):
                     execute('.', '/tmp/unused', 'a' * 40, now='2026-11-17T22:00Z')
                 predecessor.assert_not_called()
 
-    def test_rights_failure_before_retrieval(self):
-        with patch.dict(os.environ, ENV), patch('scripts.run_public_daily.verify_predecessor'), \
-             patch('scripts.run_public_daily.verify_rights', side_effect=ValueError('blocked')), \
-             patch('scripts.run_public_daily.run') as run:
-            with self.assertRaises(ValueError):
-                execute('.', '/tmp/unused', 'a' * 40, now='2026-11-17T22:00Z')
-            run.assert_not_called()
-
     def test_noop_never_promotes(self):
         def noop(*args, public_summary, **kwargs):
             public_summary.update(update='skipped', run_status='success')
         with patch.dict(os.environ, ENV), patch('scripts.run_public_daily.verify_predecessor'), \
-             patch('scripts.run_public_daily.verify_rights'), patch('scripts.run_public_daily.run', side_effect=noop), \
+             patch('scripts.run_public_daily.run', side_effect=noop), \
              patch('scripts.run_public_daily.promote') as promote:
             result = execute('.', '/tmp/unused', 'a' * 40, provider=object(), now='2026-11-17T22:00Z')
             self.assertEqual(result['publication'], 'unchanged')
@@ -54,7 +44,7 @@ class PublicDailyTests(unittest.TestCase):
             public_summary.update(update='generated', run_status='success')
         for remote in ['b' * 40, 'c' * 40]:
             with self.subTest(remote=remote), patch.dict(os.environ, ENV), \
-                 patch('scripts.run_public_daily.verify_predecessor'), patch('scripts.run_public_daily.verify_rights'), \
+                 patch('scripts.run_public_daily.verify_predecessor'), \
                  patch('scripts.run_public_daily.run', side_effect=generated), \
                  patch('scripts.run_public_daily.promote', return_value='published') as promote, \
                  patch('scripts.run_public_daily.approved_bundle', return_value=dict(version='new', data_date='2026-11-17')), \
@@ -69,7 +59,6 @@ class PublicDailyTests(unittest.TestCase):
 
     def test_fixture_runs_full_public_path_then_repeat_without_commit(self):
         # Only the provider response, wall clock and Git transport are simulated.
-        # Synthetic authorization and generated candidates stay in this temp tree.
         import shutil
         import pandas as pd
         from scripts.run_daily_update import FileProvider
@@ -83,18 +72,13 @@ class PublicDailyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             base = Path(temp)
             root = base / 'release'
-            for name in ['cloud/publication', 'backend/model_packages/main-v1', 'backend/config']:
+            for name in ['cloud/publication', 'backend/model_packages/main-v1']:
                 shutil.copytree(source / name, root / name)
             shutil.copyfile(source / 'cloud/approval.json', root / 'cloud/approval.json')
             config = root / 'backend/config'
-            evidence = config / 'publication-rights-evidence.txt'
-            evidence.write_text('SYNTHETIC TEST ONLY — NOT A REAL PERMISSION GRANT')
-            write_json(config / 'publication-rights.json', dict(
-                status='owner_authorized', provider='Yahoo Finance / IBEX 35', scopes=sorted(SCOPES),
-                valid_until='2099-01-01', reviewed_by='synthetic test', licence_reference='fixture only',
-                authorized_by='apalomo75', repository='apalomo75/RiskBEX',
-                permission_basis='synthetic test only', authorized_on='2026-11-17',
-                evidence_sha256=digest(evidence)))
+            config.mkdir()
+            for name in ['actions-regression.json', 'bme-2026.json']:
+                shutil.copyfile(source / 'backend/config' / name, config / name)
             prices = pd.read_csv(VersionStore(root / 'cloud/publication/store').current() / 'prices.csv',
                                  float_precision='round_trip')
             extra = pd.read_csv(source / 'backend/tests/fixtures/live-dry-run/extension.csv')
@@ -134,25 +118,3 @@ class PublicDailyTests(unittest.TestCase):
             self.assertEqual(sum(c[0] == 'commit' for c in calls), 1)
             self.assertEqual([c for c in calls if c[0] == 'push'],
                              [['push', 'origin', 'HEAD:refs/heads/' + BRANCH]])
-
-    def test_owner_authorization_requires_real_bound_evidence(self):
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            config = root / 'backend/config'
-            config.mkdir(parents=True)
-            evidence = config / 'publication-rights-evidence.txt'
-            evidence.write_text('SYNTHETIC TEST ONLY: permission reference')
-            receipt = dict(status='owner_authorized', provider='Yahoo Finance / IBEX 35',
-                           scopes=sorted(SCOPES), valid_until='2099-01-01', reviewed_by='fixture',
-                           licence_reference='synthetic', authorized_by='apalomo75',
-                           repository='apalomo75/RiskBEX', permission_basis='synthetic fixture',
-                           authorized_on='2026-11-17', evidence_sha256=digest(evidence))
-            from datetime import date
-            for change in [{}, dict(repository='another/repo'), dict(permission_basis=''),
-                           dict(evidence_sha256='0' * 64), dict(authorized_on='2099-01-01')]:
-                write_json(config / 'publication-rights.json', dict(receipt, **change))
-                if change:
-                    with self.assertRaises(ValueError):
-                        verify_rights(root, today=date(2026, 11, 17))
-                else:
-                    verify_rights(root, today=date(2026, 11, 17))

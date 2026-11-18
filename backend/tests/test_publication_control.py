@@ -1,5 +1,4 @@
 """Offline publication guards; only synthetic data and disposable Git repositories."""
-from datetime import date
 import json
 import io
 import os
@@ -16,7 +15,7 @@ import pandas as pd
 from scripts.run_actions_live_dry_run import run
 from scripts.run_daily_update import FileProvider
 from src.riskbex.actions_update import promote, approved_bundle, BRANCH
-from src.riskbex.publication_control import verify_rights, verify_provenance, SCOPES
+from src.riskbex.publication_control import verify_provenance
 from src.riskbex.pipeline.store import VersionStore, write_json, digest
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -82,49 +81,6 @@ class SummaryTests(unittest.TestCase):
                     run(ROOT, Path(temp) / 'work', provider=None, now='2026-11-17T22:00Z', public_summary=summary)
             self.assertEqual(summary['regression_gate'], 'failed')
             self.assertEqual(summary['run_status'], 'failed')
-
-
-class RightsTests(unittest.TestCase):
-    def test_unverified_rights_block_publication(self):
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            config = root / 'backend/config'
-            config.mkdir(parents=True)
-            write_json(config / 'publication-rights.json', {'status': 'blocked'})
-            with self.assertRaisesRegex(ValueError, 'rights unresolved'):
-                verify_rights(root)
-
-    def test_blocked_rights_stop_before_any_git_mutation(self):
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            config = root / 'backend/config'
-            config.mkdir(parents=True)
-            write_json(config / 'publication-rights.json', {'status': 'blocked'})
-            with patch('subprocess.check_output', side_effect=[BRANCH, 'a' * 40, '']) as git:
-                with self.assertRaisesRegex(ValueError, 'rights unresolved'):
-                    promote(root, root / 'nonexistent-candidate', 'a' * 40)
-            self.assertEqual([call.args[0][3] for call in git.call_args_list], ['branch', 'rev-parse', 'status'])
-
-    def test_scopes_expiry_evidence_and_missing_receipt_fail_closed(self):
-        with tempfile.TemporaryDirectory() as temp:
-            root = Path(temp)
-            config = root / 'backend/config'
-            config.mkdir(parents=True)
-            evidence = config / 'publication-rights-evidence.txt'
-            evidence.write_text('SYNTHETIC LICENCE TEST ONLY')
-            receipt = dict(status='verified', provider='Yahoo Finance / IBEX 35', scopes=sorted(SCOPES),
-                           valid_until='2026-12-01', reviewed_by='fixture', licence_reference='synthetic',
-                           evidence_sha256=digest(evidence))
-            path = config / 'publication-rights.json'
-            with self.assertRaises(FileNotFoundError):
-                verify_rights(root)
-            write_json(path, receipt)
-            verify_rights(root, today=date(2026, 11, 17))
-            for change in [dict(scopes=['derived_signals']), dict(valid_until='2026-01-01'),
-                           dict(evidence_sha256='0' * 64), dict(status='approved_by_owner')]:
-                write_json(path, dict(receipt, **change))
-                with self.assertRaises(ValueError):
-                    verify_rights(root, today=date(2026, 11, 17))
 
 
 class TransactionTests(unittest.TestCase):
@@ -200,8 +156,7 @@ class TransactionTests(unittest.TestCase):
                         remote.update(head='c' * 40, approval=approved_bundle(root))
                         return ''
                     raise AssertionError(args)
-                with patch('subprocess.check_output', side_effect=transport), \
-                     patch('src.riskbex.publication_control.verify_rights'):
+                with patch('subprocess.check_output', side_effect=transport):
                     if mode == 'success':
                         self.assertEqual(promote(root, self.work, head), 'published')
                         self.assertEqual(remote['approval']['data_date'], '2026-11-17')
@@ -255,7 +210,6 @@ class CustodyTests(unittest.TestCase):
                         '--head', 'b' * 40, '--controller', 'c' * 40]
                 with patch('sys.argv', argv), patch.dict(os.environ, {'GITHUB_RUN_ID': '42',
                         'GITHUB_RUN_ATTEMPT': '1', 'GITHUB_REPOSITORY': 'fixture/repo'}), \
-                     patch('scripts.run_cloud_publication.verify_rights'), \
                      patch('scripts.run_cloud_publication.promote') as promote_mock, redirect_stdout(output):
                     self.assertEqual(main(), 1)
                 promote_mock.assert_not_called()

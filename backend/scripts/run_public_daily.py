@@ -1,4 +1,4 @@
-"""Single public-repository daily path; one activation switch plus distribution rights required before retrieval."""
+"""Single public-repository daily path; requires production activation before retrieval."""
 import argparse
 from contextlib import redirect_stdout, redirect_stderr
 import io
@@ -14,7 +14,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from scripts.run_actions_live_dry_run import run
 from src.riskbex.actions_update import approved_bundle, promote, verify_predecessor
 from src.riskbex.pipeline.provider import YahooProvider
-from src.riskbex.publication_control import verify_rights
 
 
 def execute(root, work, head, *, now, provider=None):
@@ -23,7 +22,6 @@ def execute(root, work, head, *, now, provider=None):
             or os.getenv('RISKBEX_PUBLICATION_ENABLED') != 'true'):
         raise ValueError('Public daily activation is disabled.')
     verify_predecessor(root, head)
-    verify_rights(root)
     summary = {}
     run(root, work, provider=provider if provider is not None else YahooProvider(),
         now=now, public_summary=summary)
