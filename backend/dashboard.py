@@ -635,7 +635,7 @@ def show_landing():
     st.subheader("Pursue market returns. Manage downside risk.")
     snapshot_mode = os.getenv("RISKBEX_PRESENTATION_MODE") == "snapshot"
     if snapshot_mode:
-        st.write("RISKBEX presents a validated, read-only publication of IBEX 35 risk models and adaptive investment strategies. This application does not update market data automatically.")
+        st.write("RISKBEX presents a validated, read-only publication of IBEX 35 risk models and adaptive investment strategies. A scheduled GitHub Actions workflow processes market updates. New sessions are published when market data is available and passes validation.")
     else:
         st.write("RISKBEX combines quantitative risk models, machine learning and an automated market-data pipeline to monitor the IBEX 35 and evaluate adaptive investment strategies designed to manage downside risk.")
     render_price_regimes(welcome_history(df, data), landing=True)
