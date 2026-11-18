@@ -280,17 +280,20 @@ class CalendarAndWorkflowTests(unittest.TestCase):
                      'publication-candidate-auto', 'public-publication-auto']:
             self.assertIn(item, text)
 
-    def test_public_workflow_is_single_manual_disabled_path(self):
+    def test_public_workflow_validates_offline_with_one_publication_switch(self):
         workflow = (ROOT / '.github/workflows/cloud-publication.yml').read_text()
         self.assertNotIn('\n  schedule:', workflow)
         for item in ['workflow_dispatch:', "vars.RISKBEX_PUBLICATION_ENABLED == 'true'",
-                     "vars.RISKBEX_LIVE_DOWNLOAD_AUTHORIZED == 'true'",
                      'contents: write', 'contents: read',
                      'riskbex-protected-publication-v2', 'run_public_daily.py',
                      'persist-credentials: false', '17 20 * * 1-5', '17 22 * * 1-5',
                      'RELEASE=$(git rev-parse HEAD)', '--head "$RELEASE"']:
             self.assertIn(item, workflow)
-        for forbidden in ['state/main-daily', 'private-state', 'inputs.release_sha',
+        job_guard = workflow.split('  daily:\n', 1)[1].split('    permissions:', 1)[0]
+        self.assertNotIn('vars.', job_guard)
+        self.assertIn("if: vars.RISKBEX_PUBLICATION_ENABLED == 'true'", workflow)
+        self.assertIn('Report validation-only execution', workflow)
+        for forbidden in ['RISKBEX_LIVE_DOWNLOAD_AUTHORIZED', 'environment:', 'state/main-daily', 'private-state', 'inputs.release_sha',
                           'upload-artifact', '--force', '2026-11-16']:
             self.assertNotIn(forbidden, workflow)
         self.assertFalse((ROOT / '.github/workflows/private-daily.yml').exists())

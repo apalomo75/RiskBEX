@@ -82,10 +82,17 @@ def main(argv=None):
                           snapshot=approval, frozen_package='verified', regression_receipt='verified')), flush=True)
     with offline_guards():
         suite = unittest.TestSuite()
+        # Retired private/custody tests remain available separately; public acceptance
+        # requires neither a private repository nor GPG/artifact transport.
         for module in ['tests.test_actions_offline', 'tests.test_actions_update',
                        'tests.test_daily_pipeline', 'tests.test_actions_cloud',
-                       'tests.test_private_daily', 'tests.test_live_dry_run',
-                       'tests.test_publication_control', 'tests.test_daily_state',
+                       'tests.test_live_dry_run',
+                       'tests.test_publication_control.SummaryTests',
+                       'tests.test_publication_control.RightsTests',
+                       'tests.test_publication_control.TransactionTests',
+                       'tests.test_publication_control.CalendarAndWorkflowTests.test_expiry_blocks_final_session_target_before_network',
+                       'tests.test_publication_control.CalendarAndWorkflowTests.test_public_workflow_validates_offline_with_one_publication_switch',
+                       'tests.test_daily_state.DailyStateTests.test_public_consecutive_repeat_missing_and_stale_predecessor',
                        'tests.test_public_daily']:
             suite.addTests(unittest.defaultTestLoader.loadTestsFromName(module))
         result = unittest.TextTestRunner(verbosity=2).run(suite)
